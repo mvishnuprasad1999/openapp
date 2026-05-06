@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class DotLoader extends StatefulWidget {
-  const DotLoader({super.key});
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const DotLoader({
+    super.key,
+    this.activeColor = Colors.blueAccent,
+    this.inactiveColor = Colors.white,
+  });
 
   @override
   State<DotLoader> createState() => _DotLoaderState();
@@ -32,10 +39,12 @@ class _DotLoaderState extends State<DotLoader>
       animation: _controller,
       builder: (context, _) {
         final active = (_controller.value * 4).floor() % 4;
+
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(4, (i) {
             final isActive = i == active;
+
             return AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -43,11 +52,13 @@ class _DotLoaderState extends State<DotLoader>
               height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isActive ? Colors.blueAccent : Colors.white,
+                color: isActive
+                    ? widget.activeColor
+                    : widget.inactiveColor,
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: Colors.blueAccent.withOpacity(0.8),
+                          color: widget.activeColor.withOpacity(0.8),
                           blurRadius: 8,
                           spreadRadius: 2,
                         )

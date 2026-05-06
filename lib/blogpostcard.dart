@@ -1,105 +1,167 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:open_ui/blopostcontentcard.dart';
-import 'package:open_ui/widgets/bottombar.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_ui/riverpod/postshowprovider.dart';
+import 'blopostcontentcard.dart';
 
-class BlogPosImagetCard extends StatelessWidget {
+class BlogPosImagetCard extends ConsumerStatefulWidget {
   const BlogPosImagetCard({super.key});
 
-  static const String _source = 'vp007';
-  static const String _title =
-      'Oracle reportedly initiated one of the largest mass layoffs in its history';
-  static const String _content =
-      "Oracle's 2026 workforce reduction has impacted approximately 30,000 employees globally—roughly 18% of its staff—as the company aggressively pivots its resources toward AI infrastructure and automated code generation. The layoffs have been particularly significant in India, where an estimated 12,000 roles were cut, and across the Oracle Health division. This restructuring reflects a strategic shift where Oracle is leveraging advanced AI models to streamline product development, allowing them to replace traditional engineering and sales roles with leaner, AI-driven teams focused on high-growth cloud services. Further announcements are expected in the coming weeks as the company realigns its global workforce strategy to match aggressive cloud expansion goals.";
+  @override
+  ConsumerState<BlogPosImagetCard> createState() => _BlogPosImagetCardState();
+}
+
+class _BlogPosImagetCardState extends ConsumerState<BlogPosImagetCard> {
+  late final PageController _controller;
+  double _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+
+    _controller.addListener(() {
+      if (mounted) {
+        setState(() {
+          _page = _controller.page ?? 0;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(2.0),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Container(
-                margin: const EdgeInsets.all(5.0),
-                height: 408,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(38),
-                  border: Border.all(color: Colors.white, width: 5),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/blogpostcardsample.png'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.all(5.0),
-                height: 408,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(38),
-                  border: Border.all(color: const Color(0xFF605E5E), width: 5),
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.4),
-                      Colors.black.withOpacity(0.1),
+    final postsAsync = ref.watch(postsProvider);
+
+    return postsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text(e.toString())),
+
+      data: (posts) {
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+
+            final images = post.images.isNotEmpty
+                ? post.images
+                : ['assets/images/blogpostcardsample.png'];
+
+            /// ✅ EACH CARD HAS ITS OWN CONTROLLER
+            final PageController controller = PageController();
+            double currentPage = 0;
+
+            controller.addListener(() {
+              currentPage = controller.page ?? 0;
+            });
+
+            return StatefulBuilder(
+              builder: (context, setState) {
+                controller.addListener(() {
+                  setState(() {
+                    currentPage = controller.page ?? 0;
+                  });
+                });
+
+                return Padding(
+                  padding: const EdgeInsets.all(2.0),
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          /// ✅ IMAGE SLIDER (WORKS NOW)
+                          Container(
+                            margin: const EdgeInsets.all(5.0),
+                            height: 408,
+                            width: double.infinity,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(38),
+                              child: PageView.builder(
+                                controller: controller,
+                                itemCount: images.length,
+                                itemBuilder: (context, imgIndex) {
+                                  final img = images[imgIndex];
+
+                                  return img.startsWith("http")
+                                      ? Image.network(img, fit: BoxFit.cover)
+                                      : Image.asset(img, fit: BoxFit.cover);
+                                },
+                              ),
+                            ),
+                          ),
+
+                          /// ✅ SLIDER INDICATOR (SMOOTH)
+                          Positioned(
+                            bottom: 20,
+                            left: 125,
+                            right: 125,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final totalWidth = constraints.maxWidth;
+                                final segmentWidth = totalWidth / images.length;
+
+                                final clampedPage = currentPage.clamp(
+                                  0.0,
+                                  (images.length - 1).toDouble(),
+                                );
+
+                                return Stack(
+                                  children: [
+                                    Container(
+                                      height: 3,
+                                      width: totalWidth,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    Transform.translate(
+                                      offset: Offset(
+                                        clampedPage * segmentWidth,
+                                        0,
+                                      ),
+                                      child: Container(
+                                        height: 3,
+                                        width: segmentWidth,
+                                        decoration: BoxDecoration(
+                                          color: Colors.pink,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      /// TEXT
+                      BlogContentCard(
+                        source: post.username,
+                        title: post.title,
+                        content: post.content,
+                      ),
                     ],
                   ),
-                ),
-              ),
-              Positioned(
-                right: 20,
-                top: 20,
-                child: IconButton(
-                  onPressed: () {},
-                  icon: SvgPicture.asset(
-                    'assets/images/save.svg',
-                    width: 50,
-                    height: 50,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 28,
-                top: 82,
-                child: IconButton(
-                  onPressed: () {},
-                  icon: SvgPicture.asset(
-                    'assets/images/like.svg',
-                    width: 40,
-                    height: 40,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 39,
-                top: 130,
-                child: Text(
-                  "100",
-                  style: GoogleFonts.lexend(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const BlogContentCard(
-            source: _source,
-            title: _title,
-            content: _content,
-          ),
-       
-        ],
-      ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────

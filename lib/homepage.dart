@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:open_ui/aichatscreen.dart';
 import 'package:open_ui/blogpostcard.dart';
 import 'package:open_ui/postupload.dart';
 import 'package:open_ui/widgets/bottombar.dart';
@@ -22,12 +23,6 @@ class _HomePageState extends State<HomePage> {
     selectedIndex = widget.initialIndex;
   }
 
-  void onTabChanged(int index) {
-    setState(() {
-      selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,38 +30,69 @@ class _HomePageState extends State<HomePage> {
 
       appBar: AppBar(
         backgroundColor: const Color(0xFF191919),
-        centerTitle: false, 
+        centerTitle: false,
         elevation: 0,
-        title: SvgPicture.asset('assets/images/openlogo.svg', height: 32),
+        title: SvgPicture.asset(
+          'assets/images/openlogo.svg',
+          height: 32,
+        ),
       ),
 
       body: Stack(
         children: [
-          ListView.builder(
-            padding: const EdgeInsets.only(bottom: 100),
-            itemCount: 5,
-            itemBuilder: (context, index) {
-              return BlogPosImagetCard();
-            },
+          // 🔹 Scroll Content
+          SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 120),
+            child: const BlogPosImagetCard(),
           ),
 
+          // 🔹 Bottom Bar
           CustomBottomBar(selectedIndex: selectedIndex),
-        ],
-      ),
 
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 40, left: 50),
-        child: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PostUploadScreen()),
-            );
-          },
-          backgroundColor: const Color(0xFFE91313),
-          shape: const CircleBorder(),
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
+          // 🔴 MAIN FAB (Red)
+          Positioned(
+            bottom: 40,
+            right: 20,
+            child: FloatingActionButton(
+              heroTag: "mainFab",
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PostUploadScreen(),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFFE91313),
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+
+          // 🟣 SECOND FAB (Pink - Above)
+          Positioned(
+            bottom: 110, // adjust spacing here if needed
+            right: 24,
+            child: FloatingActionButton(
+              heroTag: "secondaryFab",
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChatScreen(),
+                  ),
+                );
+                // 👉 Add your second action here
+                
+                
+              },
+              backgroundColor: Colors.pink,
+              mini: true, // smaller button
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }

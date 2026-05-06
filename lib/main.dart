@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+// import 'package:open_ui/aichatscreen.dart';
 import 'package:open_ui/authenticationscreen.dart';
 // import 'package:open_ui/postupload.dart';
 // import 'package:open_ui/userprofile.dart';
@@ -33,6 +34,7 @@ class MyApp extends StatelessWidget {
       // PostUploadScreen(),
       // ProfileSetupScreen(),
       // ProfileShowScreen(),
+      // CompanionScreen(),
 
       const AuthScreen(isLogin: false), // ← start on auth screen
     );
