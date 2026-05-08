@@ -1,14 +1,15 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'dart:io';
-
 import 'package:image_picker/image_picker.dart';
 import 'package:open_ui/riverpod/auth_provider.dart';
 import 'package:open_ui/riverpod/post_upload_provider.dart';
 import 'package:open_ui/riverpod/postshowprovider.dart';
 
-// ─── DotLoader ───────────────────────────────────────────────────────────────
+/// ───────────────── DOT LOADER ─────────────────
 
 class DotLoader extends StatefulWidget {
   final Color activeColor;
@@ -31,6 +32,7 @@ class _DotLoaderState extends State<DotLoader>
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -69,7 +71,7 @@ class _DotLoaderState extends State<DotLoader>
                           color: widget.activeColor.withOpacity(0.8),
                           blurRadius: 8,
                           spreadRadius: 2,
-                        )
+                        ),
                       ]
                     : [],
               ),
@@ -81,7 +83,7 @@ class _DotLoaderState extends State<DotLoader>
   }
 }
 
-// ─── PostUploadScreen ─────────────────────────────────────────────────────────
+/// ───────────────── SCREEN ─────────────────
 
 class PostUploadScreen extends ConsumerStatefulWidget {
   const PostUploadScreen({super.key});
@@ -92,21 +94,42 @@ class PostUploadScreen extends ConsumerStatefulWidget {
 
 class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
   final ImagePicker _picker = ImagePicker();
+
   final List<_PickedPostImage> _images = [];
+
   final TextEditingController _titleController = TextEditingController();
+
   final TextEditingController _contentController = TextEditingController();
 
-  // ── NEW: tracks upload in-progress ──
   bool _isUploading = false;
+
+  /// IMAGE SIZE CHECK
+  Future<bool> _isValidImageSize(String path) async {
+    final file = File(path);
+
+    final bytes = await file.readAsBytes();
+
+    final codec = await ui.instantiateImageCodec(bytes);
+
+    final frame = await codec.getNextFrame();
+
+    final image = frame.image;
+
+    final width = image.width;
+    final height = image.height;
+
+    final ratio = width / height;
+
+    /// 400x200 ≈ 2.0 ratio
+    return ratio >= 1.6 && ratio <= 2.3;
+  }
 
   Future<void> _addImage() async {
     if (_images.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Maximum 5 images allowed'),
-          duration: Duration(milliseconds: 1200),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Maximum 5 images allowed')));
+
       return;
     }
 
@@ -129,27 +152,26 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
           activeControlsWidgetColor: const Color(0xFF009DFF),
           initAspectRatio: CropAspectRatioPreset.original,
           lockAspectRatio: false,
-          aspectRatioPresets: const [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.square,
-            CropAspectRatioPreset.ratio4x3,
-            CropAspectRatioPreset.ratio16x9,
-          ],
         ),
-        IOSUiSettings(
-          title: 'Crop image',
-          aspectRatioPresets: const [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.square,
-            CropAspectRatioPreset.ratio4x3,
-            CropAspectRatioPreset.ratio16x9,
-          ],
-        ),
+        IOSUiSettings(title: 'Crop image'),
         WebUiSettings(context: context),
       ],
     );
 
     if (croppedImage == null || !mounted) return;
+
+    /// VALIDATION
+    final isValid = await _isValidImageSize(croppedImage.path);
+
+    if (!isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Image should approximately match 400x200 size ratio'),
+        ),
+      );
+
+      return;
+    }
 
     setState(() {
       _images.add(
@@ -170,81 +192,129 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF161616),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _Header(),
+
+              const SizedBox(height: 30),
+
+              _UploadDropZone(onTap: _addImage),
+
+              const SizedBox(height: 14),
+
+              if (_images.isNotEmpty)
+                for (int i = 0; i < _images.length; i++) ...[
+                  _ImageFileRow(
+                    image: _images[i],
+                    onDelete: () => _deleteImage(i),
+                  ),
+                  const SizedBox(height: 7),
+                ],
+
+              const SizedBox(height: 6),
+
+              _PostTextField(
+                hintText: 'Post Title',
+                minLines: 2,
+                maxLines: 2,
+                controller: _titleController,
+              ),
+
+              const SizedBox(height: 12),
+
+              _PostTextField(
+                hintText: 'post content',
+                minLines: 8,
+                maxLines: 8,
+                controller: _contentController,
+              ),
+
+              const SizedBox(height: 10),
+
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  const _Header(),
-                  const SizedBox(height: 28),
-                  _UploadDropZone(onTap: _addImage),
-                  if (_images.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    for (var i = 0; i < _images.length; i++) ...[
-                      _ImageFileRow(
-                        image: _images[i],
-                        onDelete: () => _deleteImage(i),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                  ],
-                  const SizedBox(height: 8),
-                  _PostTextField(
-                    hintText: 'Post Title',
-                    minLines: 2,
-                    maxLines: 2,
-                    controller: _titleController,
-                  ),
-                  _PostTextField(
-                    hintText: 'post content',
-                    minLines: 8,
-                    maxLines: 8,
-                    controller: _contentController,
-                  ),
-                  const SizedBox(height: 8),
                   SizedBox(
-                    height: 36,
+                    height: 34,
+                    width: double.infinity,
                     child: ElevatedButton(
-                      // ── Disabled while uploading ──
                       onPressed: _isUploading
                           ? null
                           : () async {
+                              final title = _titleController.text.trim();
+                              final content = _contentController.text.trim();
+
+                              if (_images.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Post failed due to the images or title or content is empty,first check the images',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (title.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Post failed due to the images or title or content is empty,plese check the title'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (content.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Post failed due to the images or title or content is empty,please check the content'),
+                                  ),
+                                );
+                                return;
+                              }
+
                               final authState = ref.read(authProvider);
 
                               if (authState.token == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                      content: Text("Please login first")),
+                                    content: Text('Please login first'),
+                                  ),
                                 );
                                 return;
                               }
 
-                              final files =
-                                  _images.map((e) => File(e.path)).toList();
+                              final files = _images
+                                  .map((e) => File(e.path))
+                                  .toList();
 
-                              // ── Show loader ──
-                              setState(() => _isUploading = true);
+                              setState(() {
+                                _isUploading = true;
+                              });
 
                               try {
                                 await ref
                                     .read(postUploadProvider.notifier)
                                     .uploadPost(
                                       token: authState.token!,
-                                      title: _titleController.text.trim(),
-                                      content: _contentController.text.trim(),
+                                      title: title,
+                                      content: content,
                                       files: files,
                                     );
-                                    ref.invalidate(postsProvider);
+
+                                ref.invalidate(postsProvider);
 
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content:
-                                          Text("Post uploaded successfully"),
-                                          
+                                      content: Text(
+                                        'Post uploaded successfully',
+                                      ),
                                     ),
                                   );
 
@@ -255,84 +325,105 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
                                   });
                                 }
                               } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Error: $e")),
-                                  );
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Upload failed. Please try again',
+                                    ),
+                                  ),
+                                );
                               } finally {
-                                // ── Hide loader ──
                                 if (mounted) {
-                                  setState(() => _isUploading = false);
+                                  setState(() {
+                                    _isUploading = false;
+                                  });
                                 }
                               }
                             },
+
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF271B96),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        // Keep button style identical; disabledBackgroundColor
-                        // matches so it looks the same while loading.
-                        disabledBackgroundColor: const Color(0xFF271B96),
+                        padding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        disabledBackgroundColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(7),
                           side: const BorderSide(color: Colors.white, width: 1),
                         ),
                       ),
-                      // ── Swap label ↔ loader ──
-                      child: _isUploading
-                          ? const DotLoader(
-                              activeColor: Color(0xFFFF2130), // red
-                              inactiveColor: Colors.white,
-                            )
-                          : const Text(
-                              'post upload',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF20106F),
+                              Color(0xFF3A15C8),
+                              Color(0xFF2A0E9E),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Center(
+                          child: _isUploading
+                              ? const DotLoader(
+                                  activeColor: Colors.red,
+                                  inactiveColor: Colors.white,
+                                )
+                              : const Text(
+                                  'post upload',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  Positioned(
+                    right: 12,
+                    top: -5,
+                    child: FloatingActionButton.small(
+                      onPressed: _addImage,
+                      elevation: 0,
+                      backgroundColor: const Color(0xFFFF242F),
+                      shape: const CircleBorder(
+                        side: BorderSide(color: Colors.white, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.add_photo_alternate_outlined,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            Positioned(
-              right: 28,
-              bottom: 24,
-              child: FloatingActionButton.small(
-                onPressed: _addImage,
-                backgroundColor: const Color(0xFFFF242F),
-                foregroundColor: Colors.white,
-                shape: const CircleBorder(
-                  side: BorderSide(color: Colors.white, width: 1),
-                ),
-                child:
-                    const Icon(Icons.add_photo_alternate_outlined, size: 24),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/// ───────────────── HELPERS ─────────────────
 
 String _fileNameFromPath(String path) {
-  final normalizedPath = path.replaceAll(r'\', '/');
-  return normalizedPath.split('/').last;
+  final normalized = path.replaceAll(r'\', '/');
+
+  return normalized.split('/').last;
 }
 
 class _PickedPostImage {
-  const _PickedPostImage({required this.path, required this.fileName});
-
   final String path;
   final String fileName;
+
+  const _PickedPostImage({required this.path, required this.fileName});
 }
 
-// ─── Sub-widgets (unchanged) ──────────────────────────────────────────────────
+/// ───────────────── HEADER ─────────────────
 
 class _Header extends StatelessWidget {
   const _Header();
@@ -342,27 +433,29 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFF242424),
+            color: const Color(0xFF2B2B2B),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF555555), width: 1),
+            border: Border.all(color: const Color(0xFF555555)),
           ),
           child: IconButton(
             padding: EdgeInsets.zero,
             onPressed: () {
               Navigator.pop(context);
             },
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
         ),
+
         const SizedBox(width: 18),
+
         const Text(
           'Post content on open',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -371,105 +464,115 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _UploadDropZone extends StatelessWidget {
-  const _UploadDropZone({required this.onTap});
+/// ───────────────── UPLOAD BOX ─────────────────
 
+class _UploadDropZone extends StatelessWidget {
   final VoidCallback onTap;
+
+  const _UploadDropZone({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 225,
+        height: 230,
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFF2B2B2B),
-          borderRadius: BorderRadius.circular(42),
-          border: Border.all(color: const Color(0xFFFF2130), width: 4),
-          boxShadow: const [
-            BoxShadow(color: Color(0xFF00A7FF), spreadRadius: 3),
-          ],
+          borderRadius: BorderRadius.circular(48),
+          border: Border.all(color: const Color(0xFF009DFF), width: 3),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: const Color(0xFFA7A7A7),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.upload, color: Colors.white, size: 20),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(44),
+            border: Border.all(color: const Color(0xFFFF1428), width: 5),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF2A2A2A),
+              borderRadius: BorderRadius.circular(38),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Upload images for post',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            RichText(
-              textAlign: TextAlign.center,
-              text: const TextSpan(
-                style: TextStyle(
-                  color: Color(0xFFD1D1D1),
-                  fontSize: 11,
-                  height: 1.25,
-                ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextSpan(text: 'supported files '),
-                  TextSpan(
-                    text: 'jpg',
-                    style: TextStyle(color: Color(0xFF009DFF)),
+                  Container(
+                    width: 27,
+                    height: 27,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8A8A8A),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(
+                      Icons.upload,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                  TextSpan(text: ' format maximum up to\n'),
-                  TextSpan(
-                    text: '5',
-                    style: TextStyle(color: Color(0xFF009DFF)),
+
+                  const SizedBox(height: 8),
+
+                  const Text(
+                    'Upload images for post',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  TextSpan(text: ' images'),
+
+                  const SizedBox(height: 2),
+
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: const TextSpan(
+                      style: TextStyle(color: Color(0xFFBDBDBD), fontSize: 11),
+                      children: [
+                        TextSpan(text: 'supported files '),
+                        TextSpan(
+                          text: 'jpg',
+                          style: TextStyle(color: Color(0xFF009DFF)),
+                        ),
+                        TextSpan(text: ' format maximum up to\n'),
+                        TextSpan(
+                          text: '5',
+                          style: TextStyle(color: Color(0xFF009DFF)),
+                        ),
+                        TextSpan(text: ' images'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ImageFileRow extends StatelessWidget {
-  const _ImageFileRow({required this.image, required this.onDelete});
+/// ───────────────── IMAGE ROW ─────────────────
 
+class _ImageFileRow extends StatelessWidget {
   final _PickedPostImage image;
   final VoidCallback onDelete;
+
+  const _ImageFileRow({required this.image, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 30,
+      height: 29,
+      padding: const EdgeInsets.only(left: 14, right: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF2B2B2B),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(color: Colors.white, width: 1),
       ),
       child: Row(
         children: [
-          const SizedBox(width: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: Image.file(
-              File(image.path),
-              width: 22,
-              height: 22,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
             child: Text(
               image.fileName,
@@ -477,28 +580,35 @@ class _ImageFileRow extends StatelessWidget {
               style: const TextStyle(
                 color: Color(0xFF009DFF),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
+
           IconButton(
-            onPressed: onDelete,
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 32, height: 30),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            onPressed: onDelete,
             icon: const Icon(
               Icons.delete_outline,
-              color: Color(0xFFFF2530),
+              color: Color(0xFFFF242F),
               size: 19,
             ),
           ),
-          const SizedBox(width: 2),
         ],
       ),
     );
   }
 }
 
+/// ───────────────── TEXT FIELD ─────────────────
+
 class _PostTextField extends StatelessWidget {
+  final String hintText;
+  final int minLines;
+  final int maxLines;
+  final TextEditingController? controller;
+
   const _PostTextField({
     required this.hintText,
     required this.minLines,
@@ -506,39 +616,29 @@ class _PostTextField extends StatelessWidget {
     this.controller,
   });
 
-  final String hintText;
-  final int minLines;
-  final int maxLines;
-  final TextEditingController? controller;
-
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
-      cursorColor: const Color(0xFF009DFF),
-      style: const TextStyle(color: Colors.white, fontSize: 13),
+      style: const TextStyle(color: Colors.white, fontSize: 12),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(
-          color: Color(0xFF009DFF),
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
+        hintStyle: const TextStyle(color: Color(0xFF009DFF), fontSize: 12),
         filled: true,
-        fillColor: const Color(0xFF2B2B2B),
+        fillColor: const Color(0xFF2A2A2A),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 14,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(7),
           borderSide: const BorderSide(color: Colors.white, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF009DFF), width: 1),
+          borderRadius: BorderRadius.circular(7),
+          borderSide: const BorderSide(color: Colors.white, width: 1),
         ),
       ),
     );

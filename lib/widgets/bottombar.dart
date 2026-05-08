@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_ui/profileshowscreen.dart';
+import 'package:open_ui/savedpostscreen.dart';
 import '../homepage.dart';
 
 class CustomBottomBar extends StatefulWidget {
-  final int selectedIndex; // active tab from parent
+  final int selectedIndex;
 
-  const CustomBottomBar({
-    super.key,
-    required this.selectedIndex,
-  });
+  const CustomBottomBar({super.key, required this.selectedIndex});
 
   @override
   State<CustomBottomBar> createState() => _CustomBottomBarState();
 }
 
 class _CustomBottomBarState extends State<CustomBottomBar> {
-  // Inactive icons (white)
+  static const Color activeOrange = Color(0xFF2F88FF);
+  static const Color barColor = Color(0xFF1B1C20);
+  static const Color inactiveGrey = Color(0xFFC6C6C6);
+
   final List<String> inactiveIcons = [
     "assets/images/h1.svg",
     "assets/images/h2.svg",
@@ -25,7 +26,6 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
     "assets/images/h5.svg",
   ];
 
-  // Active icons (colored)
   final List<String> activeIcons = [
     "assets/images/a1.svg",
     "assets/images/a2.svg",
@@ -41,9 +41,7 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
       case 0:
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(
-            builder: (_) => const HomePage(initialIndex: 0),
-          ),
+          MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 0)),
           (route) => false,
         );
         break;
@@ -53,7 +51,10 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
         break;
 
       case 2:
-        // TODO: Add page
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SavedPostsScreen()),
+        );
         break;
 
       case 3:
@@ -72,6 +73,8 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
   @override
   Widget build(BuildContext context) {
     final selectedIndex = widget.selectedIndex;
+    final barWidth = MediaQuery.of(context).size.width * 0.82;
+    final itemWidth = barWidth / inactiveIcons.length;
 
     return Positioned(
       bottom: 20,
@@ -79,45 +82,77 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
       right: 0,
       child: Center(
         child: Container(
-          width: MediaQuery.of(context).size.width * 0.65,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+          width: barWidth,
+          height: 82,
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(50),
-            border: Border.all(
-              color: Colors.black,
-              width: 1.5,
-            ),
+            color: barColor,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: Colors.white.withOpacity(.6), width: 6),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(5, (index) {
-              final isActive = selectedIndex == index;
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Row(
+                children: List.generate(inactiveIcons.length, (index) {
+                  final isActive = selectedIndex == index;
 
-              return GestureDetector(
-                onTap: () => onItemTapped(index),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: SvgPicture.asset(
-                      isActive
-                          ? activeIcons[index]
-                          : inactiveIcons[index],
-                      key: ValueKey('${index}_$isActive'),
-                      height: 24,
-                      colorFilter: isActive
-                          ? null
-                          : const ColorFilter.mode(
-                              Colors.white,
-                              BlendMode.srcIn,
-                            ),
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onItemTapped(index),
+                      child: Center(
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 180),
+                          opacity: isActive ? 0 : 1,
+                          child: SvgPicture.asset(
+                            inactiveIcons[index],
+                            height: 30,
+                            // colorFilter: const ColorFilter.mode(
+                            //   inactiveGrey,
+                            //   BlendMode.srcIn,
+                            // ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                left: (itemWidth * selectedIndex) + ((itemWidth - 64) / 2),
+                top: -20,
+                child: GestureDetector(
+                  onTap: () => onItemTapped(selectedIndex),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: activeOrange,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: SvgPicture.asset(
+                        activeIcons[selectedIndex],
+                        height: 38,
+                        // colorFilter: const ColorFilter.mode(
+                        //   Colors.white,
+                        //   BlendMode.srcIn,
+                        // ),
+                      ),
                     ),
                   ),
                 ),
-              );
-            }),
+              ),
+            ],
           ),
         ),
       ),

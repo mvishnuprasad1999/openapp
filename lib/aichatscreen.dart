@@ -1,4 +1,6 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_ui/riverpod/chat_provider.dart';
@@ -13,24 +15,55 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _CompanionScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
 
+  bool _isAiTyping = false;
+  int _messagesBeforeRequest = 0;
+
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
   }
 
-  void _sendQuestion() {
+  Future<void> _sendQuestion() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
+
     FocusScope.of(context).unfocus();
 
-    ref.read(chatProvider.notifier).sendMessage(message);
+    _messagesBeforeRequest = ref.read(chatProvider).length;
+
+    setState(() {
+      _isAiTyping = true;
+    });
+
     _messageController.clear();
+
+    await Future.sync(() {
+      return ref.read(chatProvider.notifier).sendMessage(message);
+    });
+  }
+
+  void _hideTypingIfAnswerArrived(List messages) {
+    if (!_isAiTyping || messages.isEmpty) return;
+
+    final hasNewMessage = messages.length > _messagesBeforeRequest;
+    final lastMessageIsAi = messages.last.role != "user";
+
+    if (hasNewMessage && lastMessageIsAi) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _isAiTyping = false;
+        });
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(chatProvider);
+
+    _hideTypingIfAnswerArrived(messages);
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -41,11 +74,7 @@ class _CompanionScreenState extends ConsumerState<ChatScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF01050A),
-                Color(0xFF081423),
-                Color(0xFF0D244A),
-              ],
+              colors: [Color(0xFF01050A), Color(0xFF081423), Color(0xFF0D244A)],
               stops: [0, 0.42, 1],
             ),
           ),
@@ -53,11 +82,7 @@ class _CompanionScreenState extends ConsumerState<ChatScreen> {
             bottom: false,
             child: Stack(
               children: [
-                const Positioned(
-                  left: 25,
-                  top: 20,
-                  child: _BackButtonBox(),
-                ),
+                const Positioned(left: 25, top: 20, child: _BackButtonBox()),
                 const Positioned(
                   left: 80,
                   top: 30,
@@ -71,7 +96,6 @@ class _CompanionScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
 
-                /// ✅ CHAT LIST (NEW)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -79,8 +103,26 @@ class _CompanionScreenState extends ConsumerState<ChatScreen> {
                   bottom: 230,
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
-                    itemCount: messages.length,
+                    itemCount: messages.length + (_isAiTyping ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (_isAiTyping && index == messages.length) {
+                        return const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: _MessageBubble(
+                              width: 88,
+                              minHeight: 52,
+                              color: Color(0xFF1E1E1E),
+                              borderColor: Colors.white24,
+                              radius: 20,
+                              padding: EdgeInsets.all(14),
+                              child: _TypingDots(),
+                            ),
+                          ),
+                        );
+                      }
+
                       final msg = messages[index];
                       final isUser = msg.role == "user";
 
@@ -116,11 +158,7 @@ class _CompanionScreenState extends ConsumerState<ChatScreen> {
                   ),
                 ),
 
-                const Positioned(
-                  left: 23,
-                  bottom: 235,
-                  child: _SmileButton(),
-                ),
+                const Positioned(left: 23, bottom: 235, child: _SmileButton()),
 
                 Positioned(
                   left: 14,
@@ -154,12 +192,10 @@ class _BackButtonBox extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.35), width: 1),
       ),
       child: GestureDetector(
-        onTap: (){Navigator.pop(context);},
-        child: const Icon(
-          Icons.arrow_back,
-          color: Colors.white,
-          size: 27,
-        ),
+        onTap: () {
+          Navigator.pop(context);
+        },
+        child: const Icon(Icons.arrow_back, color: Colors.white, size: 27),
       ),
     );
   }
@@ -200,6 +236,60 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final value = (_controller.value + (index * 0.25)) % 1;
+            final opacity = value < 0.5 ? 0.35 + value : 1.35 - value;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Opacity(
+                opacity: opacity.clamp(0.35, 1.0),
+                child: const CircleAvatar(
+                  radius: 4,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
 class _SmileButton extends StatelessWidget {
   const _SmileButton();
 
@@ -212,20 +302,17 @@ class _SmileButton extends StatelessWidget {
         color: Color(0xFFFF1717),
         shape: BoxShape.circle,
       ),
-      child: const Icon(
-        Icons.sentiment_satisfied_alt,
-        color: Colors.white,
-        size: 20,
+      child: SvgPicture.asset(
+        'assets/images/c.svg',
+        width: 48,
+        height: 48,
       ),
     );
   }
 }
 
 class _ComposerPanel extends StatelessWidget {
-  const _ComposerPanel({
-    required this.controller,
-    required this.onSend,
-  });
+  const _ComposerPanel({required this.controller, required this.onSend});
 
   final TextEditingController controller;
   final VoidCallback onSend;
@@ -241,11 +328,7 @@ class _ComposerPanel extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          const Positioned(
-            left: 36,
-            top: 15,
-            child: _ModeText(),
-          ),
+          const Positioned(left: 36, top: 15, child: _ModeText()),
           Positioned(
             left: 8,
             right: 8,

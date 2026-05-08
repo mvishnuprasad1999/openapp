@@ -32,10 +32,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: const Color(0xFF191919),
         centerTitle: false,
         elevation: 0,
-        title: SvgPicture.asset(
-          'assets/images/openlogo.svg',
-          height: 32,
-        ),
+        title: SvgPicture.asset('assets/images/openlogo.svg', height: 32),
       ),
 
       body: Stack(
@@ -51,7 +48,7 @@ class _HomePageState extends State<HomePage> {
 
           // 🔴 MAIN FAB (Red)
           Positioned(
-            bottom: 40,
+            bottom: 120,
             right: 20,
             child: FloatingActionButton(
               heroTag: "mainFab",
@@ -71,25 +68,23 @@ class _HomePageState extends State<HomePage> {
 
           // 🟣 SECOND FAB (Pink - Above)
           Positioned(
-            bottom: 110, // adjust spacing here if needed
+            bottom: 190,
             right: 24,
-            child: FloatingActionButton(
-              heroTag: "secondaryFab",
-              onPressed: () {
-                Navigator.push(
+            child: GestureDetector(
+              onTap:(){
+                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ChatScreen(),
                   ),
                 );
-                // 👉 Add your second action here
-                
-                
               },
-              backgroundColor: Colors.pink,
-              mini: true, // smaller button
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add, color: Colors.white),
+              child: SvgPicture.asset(
+                'assets/images/c.svg',
+                width: 48,
+                height: 48,
+                // ✅ No colorFilter needed — colors are already in the SVG
+              ),
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_api.dart';
 
 class AuthState {
@@ -30,24 +31,52 @@ class AuthNotifier extends Notifier<AuthState> {
   AuthState build() => AuthState();
 
   Future<void> signup(String email, String password) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final res = await AuthApi.signup(email, password);
-      state = state.copyWith(isLoading: false, token: res["access_token"]);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
+  try {
+    state = state.copyWith(isLoading: true, error: null);
 
-  Future<void> login(String email, String password) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final res = await AuthApi.login(email, password);
-      state = state.copyWith(isLoading: false, token: res["access_token"]);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
+    final res = await AuthApi.signup(email, password);
+
+    final token = res["access_token"];
+
+    /// SAVE TOKEN
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("token", token);
+
+    state = state.copyWith(
+      isLoading: false,
+      token: token,
+    );
+  } catch (e) {
+    state = state.copyWith(
+      isLoading: false,
+      error: e.toString(),
+    );
   }
+}
+
+Future<void> login(String email, String password) async {
+  try {
+    state = state.copyWith(isLoading: true, error: null);
+
+    final res = await AuthApi.login(email, password);
+
+    final token = res["access_token"];
+
+    /// SAVE TOKEN
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("token", token);
+
+    state = state.copyWith(
+      isLoading: false,
+      token: token,
+    );
+  } catch (e) {
+    state = state.copyWith(
+      isLoading: false,
+      error: e.toString(),
+    );
+  }
+}
 
   void logout() {
     state = AuthState();
