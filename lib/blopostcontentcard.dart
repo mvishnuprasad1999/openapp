@@ -4,18 +4,20 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_ui/riverpod/reverpodprovider.dart';
 
- // <-- your provider file
+// <-- your provider file
 
 class BlogContentCard extends ConsumerStatefulWidget {
   final String source;
   final String title;
   final String content;
+  final String? profileImage;
 
   const BlogContentCard({
     super.key,
     required this.source,
     required this.title,
     required this.content,
+    required this.profileImage,
   });
 
   @override
@@ -27,31 +29,25 @@ class _BlogContentCardState extends ConsumerState<BlogContentCard> {
   int _currentPage = 0;
 
   static TextStyle get _contentStyle => GoogleFonts.lexend(
-        fontSize: 13,
-        height: 1.4,
-        fontWeight: FontWeight.w600,
-        letterSpacing: -0.25,
-        color: const Color(0xFFB8B8B8),
-      );
+    fontSize: 13,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.25,
+    color: const Color(0xFFB8B8B8),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final maxWidth =
-        MediaQuery.of(context).size.width - 16 - 24;
+    final maxWidth = MediaQuery.of(context).size.width - 16 - 24;
 
     final chunks = ref.watch(
       blogChunkProvider(
-        BlogChunkParams(
-          content: widget.content,
-          maxWidth: maxWidth,
-        ),
+        BlogChunkParams(content: widget.content, maxWidth: maxWidth),
       ),
     );
 
     final double slideHeight =
-        (_contentStyle.fontSize! *
-                (_contentStyle.height ?? 1.0) *
-                12)
+        (_contentStyle.fontSize! * (_contentStyle.height ?? 1.0) * 12)
             .toDouble();
 
     return Container(
@@ -78,10 +74,14 @@ class _BlogContentCardState extends ConsumerState<BlogContentCard> {
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             child: Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 18,
                   backgroundImage:
-                      AssetImage('assets/images/userlogo.jpg'),
+                      widget.profileImage != null &&
+                          widget.profileImage!.isNotEmpty
+                      ? NetworkImage(widget.profileImage!)
+                      : const AssetImage('assets/images/userlogo.jpg')
+                            as ImageProvider,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

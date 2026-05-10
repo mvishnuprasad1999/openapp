@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: const Color(0xFF191919),
 
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF191919),
         centerTitle: false,
         elevation: 0,

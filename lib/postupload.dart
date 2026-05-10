@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:open_ui/riverpod/auth_provider.dart';
+import 'package:open_ui/riverpod/mypost_provider.dart';
 import 'package:open_ui/riverpod/post_upload_provider.dart';
 import 'package:open_ui/riverpod/postshowprovider.dart';
 
@@ -94,42 +95,36 @@ class PostUploadScreen extends ConsumerStatefulWidget {
 
 class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
   final ImagePicker _picker = ImagePicker();
-
   final List<_PickedPostImage> _images = [];
-
   final TextEditingController _titleController = TextEditingController();
-
   final TextEditingController _contentController = TextEditingController();
 
   bool _isUploading = false;
 
-  /// IMAGE SIZE CHECK
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
   Future<bool> _isValidImageSize(String path) async {
     final file = File(path);
-
     final bytes = await file.readAsBytes();
-
     final codec = await ui.instantiateImageCodec(bytes);
-
     final frame = await codec.getNextFrame();
-
     final image = frame.image;
 
-    final width = image.width;
-    final height = image.height;
+    final ratio = image.width / image.height;
 
-    final ratio = width / height;
-
-    /// 400x200 ≈ 2.0 ratio
     return ratio >= 1.6 && ratio <= 2.3;
   }
 
   Future<void> _addImage() async {
     if (_images.length >= 5) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Maximum 5 images allowed')));
-
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum 5 images allowed')),
+      );
       return;
     }
 
@@ -160,8 +155,9 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
 
     if (croppedImage == null || !mounted) return;
 
-    /// VALIDATION
     final isValid = await _isValidImageSize(croppedImage.path);
+
+    if (!mounted) return;
 
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,7 +165,6 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
           content: Text('Image should approximately match 400x200 size ratio'),
         ),
       );
-
       return;
     }
 
@@ -189,6 +184,85 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
     });
   }
 
+  Future<void> _uploadPost() async {
+    final title = _titleController.text.trim();
+    final content = _contentController.text.trim();
+
+    if (_images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one image')),
+      );
+      return;
+    }
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter post title')),
+      );
+      return;
+    }
+
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter post content')),
+      );
+      return;
+    }
+
+    final authState = ref.read(authProvider);
+
+    if (authState.token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login first')),
+      );
+      return;
+    }
+
+    final files = _images.map((e) => File(e.path)).toList();
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      await ref.read(postUploadProvider.notifier).uploadPost(
+            token: authState.token!,
+            title: title,
+            content: content,
+            files: files,
+          );
+
+      ref.invalidate(postsProvider);
+      ref.invalidate(myPostsProvider);
+
+      await ref.read(myPostsProvider.notifier).loadPosts();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Post uploaded successfully')),
+      );
+
+      setState(() {
+        _images.clear();
+        _titleController.clear();
+        _contentController.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,11 +274,8 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _Header(),
-
               const SizedBox(height: 30),
-
               _UploadDropZone(onTap: _addImage),
-
               const SizedBox(height: 14),
 
               if (_images.isNotEmpty)
@@ -243,104 +314,7 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
                     height: 34,
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isUploading
-                          ? null
-                          : () async {
-                              final title = _titleController.text.trim();
-                              final content = _contentController.text.trim();
-
-                              if (_images.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Post failed due to the images or title or content is empty,first check the images',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              if (title.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Post failed due to the images or title or content is empty,plese check the title'),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              if (content.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Post failed due to the images or title or content is empty,please check the content'),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              final authState = ref.read(authProvider);
-
-                              if (authState.token == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please login first'),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              final files = _images
-                                  .map((e) => File(e.path))
-                                  .toList();
-
-                              setState(() {
-                                _isUploading = true;
-                              });
-
-                              try {
-                                await ref
-                                    .read(postUploadProvider.notifier)
-                                    .uploadPost(
-                                      token: authState.token!,
-                                      title: title,
-                                      content: content,
-                                      files: files,
-                                    );
-
-                                ref.invalidate(postsProvider);
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Post uploaded successfully',
-                                      ),
-                                    ),
-                                  );
-
-                                  setState(() {
-                                    _images.clear();
-                                    _titleController.clear();
-                                    _contentController.clear();
-                                  });
-                                }
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Upload failed. Please try again',
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                if (mounted) {
-                                  setState(() {
-                                    _isUploading = false;
-                                  });
-                                }
-                              }
-                            },
-
+                      onPressed: _isUploading ? null : _uploadPost,
                       style: ElevatedButton.styleFrom(
                         padding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
@@ -385,7 +359,7 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
                     right: 12,
                     top: -5,
                     child: FloatingActionButton.small(
-                      onPressed: _addImage,
+                      onPressed: _isUploading ? null : _addImage,
                       elevation: 0,
                       backgroundColor: const Color(0xFFFF242F),
                       shape: const CircleBorder(
@@ -412,7 +386,6 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
 
 String _fileNameFromPath(String path) {
   final normalized = path.replaceAll(r'\', '/');
-
   return normalized.split('/').last;
 }
 
@@ -420,7 +393,10 @@ class _PickedPostImage {
   final String path;
   final String fileName;
 
-  const _PickedPostImage({required this.path, required this.fileName});
+  const _PickedPostImage({
+    required this.path,
+    required this.fileName,
+  });
 }
 
 /// ───────────────── HEADER ─────────────────
@@ -448,9 +424,7 @@ class _Header extends StatelessWidget {
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           ),
         ),
-
         const SizedBox(width: 18),
-
         const Text(
           'Post content on open',
           style: TextStyle(
@@ -510,9 +484,7 @@ class _UploadDropZone extends StatelessWidget {
                       size: 20,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Upload images for post',
                     style: TextStyle(
@@ -521,9 +493,7 @@ class _UploadDropZone extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-
                   const SizedBox(height: 2),
-
                   RichText(
                     textAlign: TextAlign.center,
                     text: const TextSpan(
@@ -559,7 +529,10 @@ class _ImageFileRow extends StatelessWidget {
   final _PickedPostImage image;
   final VoidCallback onDelete;
 
-  const _ImageFileRow({required this.image, required this.onDelete});
+  const _ImageFileRow({
+    required this.image,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -584,7 +557,6 @@ class _ImageFileRow extends StatelessWidget {
               ),
             ),
           ),
-
           IconButton(
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),

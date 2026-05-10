@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:open_ui/mypostscreen.dart';
 import 'package:open_ui/profileshowscreen.dart';
 import 'package:open_ui/savedpostscreen.dart';
 import '../homepage.dart';
@@ -47,7 +48,10 @@ class _CustomBottomBarState extends State<CustomBottomBar> {
         break;
 
       case 1:
-        // TODO: Search page
+        //  Navigator.push(
+        //   context,
+        //   MaterialPageRoute(builder: (_) => const MyPostsScreen()),
+        // );
         break;
 
       case 2:

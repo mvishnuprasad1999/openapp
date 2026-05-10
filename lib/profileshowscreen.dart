@@ -1,12 +1,12 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:open_ui/homepage.dart';
+import 'package:open_ui/mypostscreen.dart';
 import 'package:open_ui/riverpod/profileshow_provider.dart';
 
 import '../widgets/bottombar.dart';
+// 👈 make sure this exists
 
 class ProfileShowScreen extends ConsumerWidget {
   const ProfileShowScreen({super.key});
@@ -63,12 +63,12 @@ class ProfileShowScreen extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          // Back button
                           GestureDetector(
                             onTap: () => Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const HomePage(initialIndex: 0),
+                                builder: (_) =>
+                                    const HomePage(initialIndex: 0),
                               ),
                               (route) => false,
                             ),
@@ -125,10 +125,10 @@ class ProfileShowScreen extends ConsumerWidget {
                           shape: BoxShape.circle,
                           gradient: SweepGradient(
                             colors: [
-                              Color(0xFF3A7BD5), // blue
-                              Color(0xFF6A3DE8), // purple
-                              Color(0xFFba1e23), // red
-                              Color(0xFF3A7BD5), // back to blue
+                              Color(0xFF3A7BD5),
+                              Color(0xFF6A3DE8),
+                              Color(0xFFba1e23),
+                              Color(0xFF3A7BD5),
                             ],
                           ),
                         ),
@@ -157,6 +157,51 @@ class ProfileShowScreen extends ConsumerWidget {
                     ),
 
                     const SizedBox(height: 24),
+
+                    // ── YOUR POSTS BUTTON (ADDED) ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MyPostsScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFba1e23),
+                                Color(0xFF6A3DE8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.article_rounded,
+                                  color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                "My Posts",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
 
                     Expanded(
                       child: SingleChildScrollView(
@@ -206,8 +251,8 @@ class ProfileShowScreen extends ConsumerWidget {
                               _buildLabel('About You'),
                               const SizedBox(height: 8),
                               _buildReadField(
-                                value:
-                                    user.profileDescription ?? "No description",
+                                value: user.profileDescription ??
+                                    "No description",
                                 icon: Icons.notes_rounded,
                                 multiLine: true,
                                 iconBg: true,
@@ -273,13 +318,12 @@ class ProfileShowScreen extends ConsumerWidget {
                   child: Icon(icon, color: Colors.white, size: 15),
                 )
               : Icon(icon, color: const Color(0xFFba1e23)),
-
           const SizedBox(width: 10),
-
           Expanded(
             child: Text(
               value,
-              textAlign: justified ? TextAlign.justify : TextAlign.start,
+              textAlign:
+                  justified ? TextAlign.justify : TextAlign.start,
               style: const TextStyle(color: Colors.white),
             ),
           ),

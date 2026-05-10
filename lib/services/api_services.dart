@@ -1,0 +1,378 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:open_ui/model/createpostshowmodel.dart';
+import 'package:open_ui/model/user_model.dart';
+
+import 'api_config.dart';
+
+// =========================
+// AUTH API
+// =========================
+class AuthApi {
+  static Future<Map<String, dynamic>> signup(
+    String email,
+    String password,
+  ) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/signup"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Server error: ${response.statusCode}");
+    }
+
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/login"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Server error: ${response.statusCode}");
+    }
+
+    return jsonDecode(response.body);
+  }
+}
+
+// =========================
+// CHAT API
+// =========================
+class ChatApi {
+  static Future<String> sendMessage({
+    required String query,
+    required List<Map<String, String>> history,
+  }) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/chat"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "query": query,
+        "history": history,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data["answer"];
+    } else {
+      throw Exception("Chat failed: ${response.body}");
+    }
+  }
+}
+
+// =========================
+// PROFILE CREATE API
+// =========================
+class CreateProfileApi {
+  static Future<Map<String, dynamic>> createProfile({
+    required String token,
+    required String name,
+    required String username,
+    required String title,
+    required String description,
+    File? imageFile,
+  }) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse("${ApiConfig.baseUrl}/create-profile"),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.fields['name'] = name;
+    request.fields['username'] = username;
+    request.fields['profile_title'] = title;
+    request.fields['profile_description'] = description;
+
+    if (imageFile != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          imageFile.path,
+        ),
+      );
+    }
+
+    final response = await request.send();
+    final responseData = await response.stream.bytesToString();
+
+    if (response.statusCode != 200) {
+      throw Exception("Profile creation failed: ${response.statusCode}");
+    }
+
+    return jsonDecode(responseData);
+  }
+}
+
+// =========================
+// POST UPLOAD API
+// =========================
+class PostUploadApi {
+  static Future<void> createPost({
+    required String token,
+    required String title,
+    required String content,
+    required List<File> files,
+  }) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse("${ApiConfig.baseUrl}/create-post"),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.fields['title'] = title;
+    request.fields['content'] = content;
+
+    for (var file in files) {
+      request.files.add(
+        await http.MultipartFile.fromPath('files', file.path),
+      );
+    }
+
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+
+    if (response.statusCode != 200 &&
+        response.statusCode != 201) {
+      throw Exception("Post upload failed: $body");
+    }
+  }
+}
+
+// // =========================
+// // POSTS API
+// // =========================
+// class PostApi {
+//   static Future<List<Post>> getPosts() async {
+//     final res = await http.get(
+//       Uri.parse("${ApiConfig.baseUrl}/posts"),
+//     );
+
+//     if (res.statusCode != 200) {
+//       throw Exception("Failed to load posts");
+//     }
+
+//     final data = jsonDecode(res.body) as List;
+//     return data.map((e) => Post.fromJson(e)).toList();
+//   }
+// }
+
+// =========================
+// POSTS of logined user
+// =========================
+
+class MyPostApi {
+  static Future<List<Post>> getMyPosts({
+    required String token,
+  }) async {
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/my-posts"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load my posts");
+    }
+
+    final data = jsonDecode(res.body) as List;
+
+    return data.map((e) => Post.fromJson(e)).toList();
+  }
+}
+/// =========================
+/// POST FETCH API
+/// =========================
+class PostApi {
+  static Future<List<Post>> getPosts() async {
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/posts"),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load posts");
+    }
+
+    final data = jsonDecode(res.body) as List;
+    return data.map((e) => Post.fromJson(e)).toList();
+  }
+
+  static Future<List<Post>> getMyPosts({
+    required String token,
+  }) async {
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/my-posts"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load my posts");
+    }
+
+    final data = jsonDecode(res.body) as List;
+    return data.map((e) => Post.fromJson(e)).toList();
+  }
+}
+
+/// =========================
+/// POST ACTION API
+/// =========================
+class PostActionApi {
+  /// DELETE POST
+  static Future<void> deletePost({
+    required int postId,
+    required String token,
+  }) async {
+    final res = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/post/$postId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Delete failed: ${res.body}");
+    }
+  }
+
+  /// LIKE POST (example endpoint)
+  static Future<void> likePost({
+    required int postId,
+    required String token,
+  }) async {
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/like/$postId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Like failed");
+    }
+  }
+
+  /// SAVE POST
+  static Future<void> savePost({
+    required int postId,
+    required String token,
+  }) async {
+    final res = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/save/$postId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Save failed");
+    }
+  }
+}
+// =========================
+// PROFILE SHOW API
+// =========================
+class ProfileShowApi {
+  static Future<UserModel> getProfile(String token) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/me"),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to fetch profile");
+    }
+
+    return UserModel.fromJson(jsonDecode(response.body));
+  }
+}
+
+
+// =========================
+// Save and Unsave Api
+// =========================
+
+class SavePostApi {
+  static Future<void> savePost({
+    required int postId,
+    required String token,
+  }) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/save/$postId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception("Failed to save post: ${response.body}");
+    }
+  }
+
+  static Future<void> unsavePost({
+    required int postId,
+    required String token,
+  }) async {
+    final response = await http.delete(
+      Uri.parse("${ApiConfig.baseUrl}/save/$postId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception("Failed to unsave post: ${response.body}");
+    }
+  }
+}
+
+
+// =========================
+// SAVE POST SHOW API
+// =========================
+class SavePostShowApi {
+  static Future<void> savePost({
+    required int postId,
+    required String token,
+  }) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/save/$postId"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    if (response.statusCode != 200 &&
+        response.statusCode != 201) {
+      throw Exception("Failed to save post");
+    }
+  }
+
+  static Future<List<dynamic>> getSavedPosts({
+    required String token,
+  }) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/saved-posts"),
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load saved posts");
+    }
+  }
+}

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_ui/riverpod/postshowprovider.dart';
 import 'package:open_ui/riverpod/save_post_provider.dart';
+import 'package:open_ui/riverpod/save_post_show.provider.dart';
 import 'package:open_ui/widgets/blogpostshimmer.dart';
 
 import 'blopostcontentcard.dart';
@@ -166,20 +167,24 @@ class _PostCardState extends State<_PostCard> {
                     /// SAVE BUTTON
                     Consumer(
                       builder: (context, ref, _) {
-                        final isSaved = ref
-                            .watch(savedPostsProvider)
-                            .contains(post.id);
+                        final savedPosts = ref.watch(savedPostsProvider);
+                        final isSaved = savedPosts.contains(post.id);
 
                         return GestureDetector(
                           onTap: () async {
                             try {
-                              await ref
-                                  .read(savedPostsProvider.notifier)
-                                  .savePost(post.id);
+                              final notifier = ref.read(
+                                savedPostsProvider.notifier,
+                              );
+
+                              await notifier.savePost(post.id);
+
+                              ref.refresh(savedPostsListProvider);
 
                               if (!context.mounted) return;
 
                               final overlay = Overlay.of(context);
+
                               final overlayEntry = OverlayEntry(
                                 builder: (context) => Positioned(
                                   top: MediaQuery.of(context).padding.top + 20,
@@ -209,7 +214,7 @@ class _PostCardState extends State<_PostCard> {
                                             ),
                                             SizedBox(width: 8),
                                             Text(
-                                              "Post unsaved",
+                                              "Post saved",
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.w600,
@@ -240,13 +245,17 @@ class _PostCardState extends State<_PostCard> {
                             height: 42,
                             width: 42,
                             child: Center(
-                              child: SvgPicture.asset(
-                                isSaved
-                                    ? "assets/images/save_filled.svg"
-                                    : "assets/images/save.svg",
-                                height: 42,
-                                width: 42,
-                              ),
+                              child: isSaved
+                                  ? const Icon(
+                                      Icons.bookmark,
+                                      color: Colors.white,
+                                      size: 34,
+                                    )
+                                  : SvgPicture.asset(
+                                      "assets/images/save.svg",
+                                      height: 42,
+                                      width: 42,
+                                    ),
                             ),
                           ),
                         );
@@ -339,10 +348,12 @@ class _PostCardState extends State<_PostCard> {
           ),
 
           /// TEXT CONTENT
+          /// TEXT CONTENT
           BlogContentCard(
             source: post.username,
             title: post.title,
             content: post.content,
+            profileImage: post.profileImage,
           ),
         ],
       ),

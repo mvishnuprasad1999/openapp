@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:open_ui/services/post_upload_api.dart';
+import 'package:open_ui/services/api_services.dart';
 
 
 final postUploadProvider =

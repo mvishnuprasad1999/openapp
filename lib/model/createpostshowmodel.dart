@@ -1,8 +1,15 @@
+import 'user_model.dart';
+
 class Post {
   final int id;
   final String title;
   final String content;
   final String username;
+
+  final UserModel? user;
+
+  final String? profileImage;
+
   final List<String> images;
 
   Post({
@@ -11,23 +18,34 @@ class Post {
     required this.content,
     required this.username,
     required this.images,
+    this.user,
+    this.profileImage,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
-    final user = json['user'];
+    final userJson =
+        json['user'] as Map<String, dynamic>?;
 
     return Post(
       id: json['id'] ?? 0,
       title: json['title'] ?? "",
       content: json['content'] ?? "",
 
-      /// ✅ FIX HERE
-      username: user != null ? (user['username'] ?? "unknown") : "unknown",
+      username:
+          userJson?['username'] ?? "unknown",
 
-      /// ✅ SAFE IMAGES
+      user: userJson != null
+          ? UserModel.fromJson(userJson)
+          : null,
+
+      profileImage:
+          userJson?['profile_image'],
+
       images: (json['images'] as List?)
-              ?.map((e) => e['image_url'] as String? ?? "")
-              .where((e) => e.isNotEmpty)
+              ?.map(
+                (e) =>
+                    e['image_url'].toString(),
+              )
               .toList() ??
           [],
     );
