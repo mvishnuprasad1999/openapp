@@ -233,9 +233,20 @@ class _PostUploadScreenState extends ConsumerState<PostUploadScreen> {
           );
 
       ref.invalidate(postsProvider);
-      ref.invalidate(myPostsProvider);
 
-      await ref.read(myPostsProvider.notifier).loadPosts();
+/// GET CURRENT USER ID
+final currentUserId = 1;
+
+/// REFRESH MY POSTS
+ref.invalidate(
+  myPostsProvider(currentUserId),
+);
+
+await ref
+    .read(
+      myPostsProvider(currentUserId).notifier,
+    )
+    .loadPosts();
 
       if (!mounted) return;
 

@@ -6,22 +6,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthState {
   final bool isLoading;
   final String? token;
+  final int? userId;
   final String? error;
 
   AuthState({
     this.isLoading = false,
     this.token,
+    this.userId,
     this.error,
   });
 
   AuthState copyWith({
     bool? isLoading,
     String? token,
+    int? userId,
     String? error,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       token: token ?? this.token,
+      userId: userId ?? this.userId,
       error: error,
     );
   }

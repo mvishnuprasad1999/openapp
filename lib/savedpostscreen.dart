@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:open_ui/homepage.dart';
+import 'package:open_ui/riverpod/likestaeprovider.dart';
+import 'package:open_ui/riverpod/postshowprovider.dart';
 import 'package:open_ui/riverpod/save_post_provider.dart';
 import 'package:open_ui/riverpod/save_post_show.provider.dart';
 import 'package:open_ui/services/api_services.dart';
@@ -12,11 +14,34 @@ import 'package:open_ui/widgets/bottombar.dart';
 
 import 'blopostcontentcard.dart';
 
-class SavedPostsScreen extends ConsumerWidget {
+class SavedPostsScreen extends ConsumerStatefulWidget {
   const SavedPostsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SavedPostsScreen> createState() => _SavedPostsScreenState();
+}
+
+class _SavedPostsScreenState extends ConsumerState<SavedPostsScreen> {
+  int _loggedUserId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLoggedUserId();
+  }
+
+  Future<void> _loadLoggedUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("token");
+    if (token == null) return;
+    try {
+      final user = await ProfileShowApi.getProfile(token);
+      if (mounted) setState(() => _loggedUserId = user.id);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final savedPostsAsync = ref.watch(savedPostsListProvider);
 
     return Scaffold(
@@ -77,6 +102,23 @@ class SavedPostsScreen extends ConsumerWidget {
                 );
               }
 
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                for (final post in savedPosts) {
+                  final postId = post["id"] is int
+                      ? post["id"] as int
+                      : int.tryParse(post["id"].toString()) ?? 0;
+                  ref.read(likeStateProvider.notifier).init(
+                        postId,
+                        isLiked: post["is_liked"] == true,
+                        likeCount: post["likes_count"] is int
+                            ? post["likes_count"] as int
+                            : int.tryParse(
+                                    post["likes_count"]?.toString() ?? "0") ??
+                                0,
+                      );
+                }
+              });
+
               return RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(savedPostsListProvider);
@@ -87,7 +129,11 @@ class SavedPostsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 120),
                   itemBuilder: (context, index) {
                     final post = savedPosts[index];
-                    return _SavedPostCard(post: post);
+                    return _SavedPostCard(
+                      key: ValueKey(post["id"]),
+                      post: post,
+                      loggedUserId: _loggedUserId,
+                    );
                   },
                 ),
               );
@@ -102,8 +148,13 @@ class SavedPostsScreen extends ConsumerWidget {
 
 class _SavedPostCard extends ConsumerStatefulWidget {
   final dynamic post;
+  final int loggedUserId;
 
-  const _SavedPostCard({required this.post});
+  const _SavedPostCard({
+    super.key,
+    required this.post,
+    required this.loggedUserId,
+  });
 
   @override
   ConsumerState<_SavedPostCard> createState() => _SavedPostCardState();
@@ -112,12 +163,21 @@ class _SavedPostCard extends ConsumerStatefulWidget {
 class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
   late final PageController _controller;
   double _currentPage = 0;
+
   bool _isUnsaving = false;
+  bool _isLikeLoading = false;
+
+  late final int _postId;
 
   @override
   void initState() {
     super.initState();
+
     _controller = PageController(viewportFraction: 1);
+
+    _postId = widget.post["id"] is int
+        ? widget.post["id"] as int
+        : int.tryParse(widget.post["id"].toString()) ?? 0;
 
     _controller.addListener(() {
       if (!mounted) return;
@@ -134,94 +194,155 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
   }
 
   int _toInt(dynamic value) {
+    if (value == null) return 0;
     if (value is int) return value;
-    return int.parse(value.toString());
+    return int.tryParse(value.toString()) ?? 0;
   }
 
   List<String> _extractImageUrls(dynamic rawImages) {
     if (rawImages == null || rawImages is! List || rawImages.isEmpty) {
       return [];
     }
-
     return rawImages
         .map<String>((img) {
-          if (img is Map) {
-            return img["image_url"]?.toString() ?? "";
-          }
+          if (img is Map) return img["image_url"]?.toString() ?? "";
           return img.toString();
         })
         .where((url) => url.isNotEmpty)
         .toList();
   }
 
-  Future<void> _unsavePost(BuildContext context, dynamic post) async {
-    if (_isUnsaving) return;
+  void _showTopOverlay({
+    required BuildContext context,
+    required String message,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: iconColor, size: 26),
+                  const SizedBox(width: 8),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(overlayEntry);
+    Future.delayed(const Duration(seconds: 2), () => overlayEntry.remove());
+  }
 
-    setState(() {
-      _isUnsaving = true;
-    });
+  Future<void> _toggleLike(BuildContext context) async {
+    if (_isLikeLoading) return;
+
+    final likeNotifier = ref.read(likeStateProvider.notifier);
+    final currentState = ref.read(likeStateProvider)[_postId];
+
+    if (currentState == null) return;
+
+    final wasLiked = currentState.isLiked;
+    final oldCount = currentState.likeCount;
+
+    likeNotifier.update(
+      _postId,
+      isLiked: !wasLiked,
+      likeCount: wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1,
+    );
+
+    setState(() => _isLikeLoading = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
+      if (token == null) throw Exception("User not logged in");
 
-      if (token == null) {
-        throw Exception("User not logged in");
+      final result = wasLiked
+          ? await PostActionApi.unlikePost(postId: _postId, token: token)
+          : await PostActionApi.likePost(postId: _postId, token: token);
+
+      final updatedLikeCount =
+          result["likes_count"] ?? result["likesCount"] ?? result["like_count"];
+      final updatedIsLiked =
+          result["is_liked"] ?? result["isLiked"] ?? result["liked"];
+
+      if (!mounted) return;
+
+      likeNotifier.update(
+        _postId,
+        isLiked:
+            updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
+        likeCount: updatedLikeCount != null
+            ? _toInt(updatedLikeCount)
+            : (wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1),
+      );
+
+      ref.invalidate(postsProvider);
+    } catch (e) {
+      if (mounted) {
+        likeNotifier.update(_postId, isLiked: wasLiked, likeCount: oldCount);
       }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLikeLoading = false);
+    }
+  }
 
-      final postId = _toInt(post["id"]);
+  Future<void> _unsavePost(BuildContext context, dynamic post) async {
+    if (_isUnsaving) return;
+    setState(() => _isUnsaving = true);
 
-      await SavePostApi.unsavePost(postId: postId, token: token);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) throw Exception("User not logged in");
 
-      ref.read(savedPostsProvider.notifier).unsavePostLocal(postId);
+      await SavePostApi.unsavePost(postId: _postId, token: token);
+
+      ref.read(savedPostsProvider.notifier).unsavePostLocal(_postId);
       ref.invalidate(savedPostsListProvider);
+      ref.invalidate(postsProvider);
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(
-            left: 18,
-            right: 18,
-            bottom: MediaQuery.of(context).size.height - 150,
-          ),
-          backgroundColor: const Color(0xFF151515),
-          elevation: 8,
-          duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Colors.white24),
-          ),
-          content: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_box, color: Colors.greenAccent, size: 20),
-              SizedBox(width: 10),
-              Text(
-                "Unsaved",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+      _showTopOverlay(
+        context: context,
+        message: "Post unsaved",
+        icon: Icons.check_circle,
+        iconColor: Colors.green,
       );
     } catch (e) {
       if (!context.mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
-      if (mounted) {
-        setState(() {
-          _isUnsaving = false;
-        });
-      }
+      if (mounted) setState(() => _isUnsaving = false);
     }
   }
 
@@ -230,6 +351,16 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
     final post = widget.post;
     final List<String> images = _extractImageUrls(post["images"]);
     final indicatorCount = images.isEmpty ? 1 : images.length;
+
+    final likeMap = ref.watch(likeStateProvider);
+    final likeState = likeMap[_postId];
+    final isLiked = likeState?.isLiked ?? (post["is_liked"] == true);
+    final likeCount = likeState?.likeCount ?? _toInt(post["likes_count"]);
+
+    // Author ID — the person who wrote this saved post
+    final int authorId = post["user"] != null
+        ? _toInt(post["user"]["id"])
+        : _toInt(post["user_id"]);
 
     return Padding(
       padding: const EdgeInsets.all(2.0),
@@ -259,40 +390,22 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
                           scrollDirection: Axis.horizontal,
                           itemCount: images.length,
                           onPageChanged: (value) {
-                            setState(() {
-                              _currentPage = value.toDouble();
-                            });
+                            setState(() => _currentPage = value.toDouble());
                           },
                           itemBuilder: (context, imgIndex) {
                             final url = images[imgIndex];
-
                             return Image.network(
                               url,
                               width: double.infinity,
                               height: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.asset(
-                                  "assets/images/blogpostcardsample.png",
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                );
-                              },
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-
-                                    return Container(
-                                      color: Colors.grey[900],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.pink,
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    );
-                                  },
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Image.asset(
+                                "assets/images/blogpostcardsample.png",
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
                             );
                           },
                         ),
@@ -348,20 +461,38 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
                     const SizedBox(height: 12),
                     Column(
                       children: [
-                        SizedBox(
-                          height: 42,
-                          width: 42,
-                          child: Center(
-                            child: SvgPicture.asset(
-                              "assets/images/like.svg",
-                              height: 42,
-                              width: 42,
+                        GestureDetector(
+                          onTap: () => _toggleLike(context),
+                          child: SizedBox(
+                            height: 42,
+                            width: 42,
+                            child: Center(
+                              child: _isLikeLoading
+                                  ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.blue,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : SvgPicture.asset(
+                                      "assets/images/like.svg",
+                                      height: 42,
+                                      width: 42,
+                                      colorFilter: isLiked
+                                          ? const ColorFilter.mode(
+                                              Colors.blue,
+                                              BlendMode.srcIn,
+                                            )
+                                          : null,
+                                    ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          "${post["likes_count"] ?? 0}",
+                          likeCount.toString(),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -416,17 +547,18 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
               ),
             ],
           ),
-          BlogContentCard(
-            source: post["user"]?["username"] ?? post["username"] ?? "Unknown",
 
-            title: post["title"] ?? "",
-
-            content: post["content"] ?? "",
-
-            profileImage: post["user"]?["profile_image"],
-          ),
+          // ✅ loggedUserId = who is viewing, authorId = who wrote the post
+       BlogContentCard(
+  userId: authorId,              // already computed above as _toInt(post["user"]["id"])
+  source: post["user"]?["username"] ?? post["username"] ?? "Unknown",
+  title: post["title"] ?? "",
+  content: post["content"] ?? "",
+  profileImage: post["user"]?["profile_image"],
+),
         ],
       ),
     );
   }
 }
+

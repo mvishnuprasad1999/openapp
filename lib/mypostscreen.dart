@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_ui/services/api_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:open_ui/model/user_model.dart';
 import 'package:open_ui/riverpod/mypost_provider.dart';
 import 'package:open_ui/widgets/blogpostshimmer.dart';
 import 'package:open_ui/widgets/bottombar.dart';
@@ -8,11 +12,23 @@ import 'package:open_ui/widgets/bottombar.dart';
 import 'blopostcontentcard.dart';
 
 class MyPostsScreen extends ConsumerWidget {
-  const MyPostsScreen({super.key});
+  final int userId;
+
+  const MyPostsScreen({
+    super.key,
+    required this.userId,
+  });
+
+  Future<UserModel?> _getLoggedUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("token");
+    if (token == null || token.isEmpty) return null;
+    return ProfileShowApi.getProfile(token);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final posts = ref.watch(myPostsProvider);
+    final posts = ref.watch(myPostsProvider(userId));
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -46,45 +62,65 @@ class MyPostsScreen extends ConsumerWidget {
         ),
         title: const Text(
           "My Posts",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: Stack(
-        children: [
-          posts.when(
-            loading: () => const BlogPostShimmer(),
-            error: (e, _) => Center(
-              child: Text(
-                "Error: $e",
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            data: (data) {
-              if (data.isEmpty) {
-                return const Center(
-                  child: Text(
-                    "No posts yet",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                );
-              }
+      body: FutureBuilder<UserModel?>(
+        future: _getLoggedUser(),
+        builder: (context, userSnapshot) {
+          if (userSnapshot.connectionState == ConnectionState.waiting) {
+            return const BlogPostShimmer();
+          }
 
-              return RefreshIndicator(
-                onRefresh: () async {
-                  await ref.read(myPostsProvider.notifier).loadPosts();
-                },
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 120),
-                  itemCount: data.length,
-                  itemBuilder: (context, i) {
-                    return _MyPostCard(post: data[i]);
-                  },
+          final loggedUser = userSnapshot.data;
+
+          return Stack(
+            children: [
+              posts.when(
+                loading: () => const BlogPostShimmer(),
+                error: (e, _) => Center(
+                  child: Text(
+                    "Error: $e",
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
-              );
-            },
-          ),
-          const CustomBottomBar(selectedIndex: 3),
-        ],
+                data: (data) {
+                  if (data.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        "No posts yet",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await ref
+                          .read(myPostsProvider(userId).notifier)
+                          .loadPosts();
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 120),
+                      itemCount: data.length,
+                      itemBuilder: (context, i) {
+                        return _MyPostCard(
+                          post: data[i],
+                          loggedUser: loggedUser,
+                          fallbackUserId: userId,
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+              const CustomBottomBar(selectedIndex: 3),
+            ],
+          );
+        },
       ),
     );
   }
@@ -92,8 +128,14 @@ class MyPostsScreen extends ConsumerWidget {
 
 class _MyPostCard extends ConsumerStatefulWidget {
   final dynamic post;
+  final UserModel? loggedUser;
+  final int fallbackUserId;
 
-  const _MyPostCard({required this.post});
+  const _MyPostCard({
+    required this.post,
+    required this.loggedUser,
+    required this.fallbackUserId,
+  });
 
   @override
   ConsumerState<_MyPostCard> createState() => _MyPostCardState();
@@ -118,7 +160,6 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
 
   dynamic _read(dynamic obj, String key) {
     if (obj is Map) return obj[key];
-
     try {
       switch (key) {
         case "id":
@@ -133,23 +174,20 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
           return obj.likesCount;
         case "username":
           return obj.username;
+        case "profile_image":
+          return obj.profileImage;
         case "user":
           return obj.user;
       }
     } catch (_) {}
-
     return null;
   }
 
   List<String> _images(dynamic raw) {
     if (raw is! List || raw.isEmpty) return [];
-
     return raw
         .map<String>((img) {
-          if (img is Map) {
-            return img["image_url"]?.toString() ?? "";
-          }
-
+          if (img is Map) return img["image_url"]?.toString() ?? "";
           try {
             return img.imageUrl?.toString() ?? "";
           } catch (_) {
@@ -160,23 +198,62 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
         .toList();
   }
 
-  String _source(dynamic post) {
-    final user = _read(post, "user");
-    final username = user != null ? _read(user, "username") : null;
+  int _loggedUserId() {
+    final loggedUser = widget.loggedUser;
+    final id = loggedUser == null ? null : _read(loggedUser, "id");
+    if (id is int) return id;
+    if (id != null) return int.tryParse(id.toString()) ?? widget.fallbackUserId;
+    return widget.fallbackUserId;
+  }
 
-    return (username ?? _read(post, "username") ?? "Unknown").toString();
+  String _loggedUsername() {
+    final loggedUser = widget.loggedUser;
+    if (loggedUser == null) return "Unknown";
+    return _read(loggedUser, "username")?.toString() ?? "Unknown";
+  }
+
+  String? _loggedProfileImage() {
+    final loggedUser = widget.loggedUser;
+    if (loggedUser == null) return null;
+    return _read(loggedUser, "profile_image")?.toString();
+  }
+
+  /// Gets the author ID from the post — works for both Map and typed Post
+  int _authorId() {
+    final post = widget.post;
+    // Try post.user.id first (typed Post object)
+    try {
+      final user = post.user;
+      if (user != null) {
+        final id = user.id;
+        if (id is int) return id;
+        return int.tryParse(id.toString()) ?? _loggedUserId();
+      }
+    } catch (_) {}
+    // Try map access
+    if (post is Map) {
+      final user = post["user"];
+      if (user is Map) {
+        final id = user["id"];
+        if (id is int) return id;
+        return int.tryParse(id?.toString() ?? "") ?? _loggedUserId();
+      }
+      final uid = post["user_id"];
+      if (uid is int) return uid;
+      return int.tryParse(uid?.toString() ?? "") ?? _loggedUserId();
+    }
+    // Fallback: these are MY posts so author = logged user
+    return _loggedUserId();
   }
 
   Future<void> _delete(int postId) async {
     if (_isDeleting) return;
-
     setState(() => _isDeleting = true);
-
     try {
-      await ref.read(myPostsProvider.notifier).deletePost(postId);
-
+      await ref
+          .read(myPostsProvider(_loggedUserId()).notifier)
+          .deletePost(postId);
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -191,12 +268,9 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
       );
     } catch (e) {
       if (!mounted) return;
-
       setState(() => _isDeleting = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Delete failed: $e")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Delete failed: $e")));
     }
   }
 
@@ -250,13 +324,9 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                                     height: double.infinity,
                                     fit: BoxFit.cover,
                                   ),
-                                  loadingBuilder: (
-                                    context,
-                                    child,
-                                    loadingProgress,
-                                  ) {
+                                  loadingBuilder:
+                                      (context, child, loadingProgress) {
                                     if (loadingProgress == null) return child;
-
                                     return Container(
                                       color: Colors.grey[900],
                                       child: const Center(
@@ -352,7 +422,6 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                     final totalWidth = constraints.maxWidth;
                     final segmentWidth =
                         count == 1 ? totalWidth : totalWidth / count;
-
                     return Stack(
                       children: [
                         Container(
@@ -383,11 +452,15 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
               ),
             ],
           ),
+
+          // ✅ _authorId() safely reads user.id from both Map and typed Post
           BlogContentCard(
-            source: _source(post),
+            userId: _authorId(),
+            source: _read(post, "username")?.toString() ?? _loggedUsername(),
             title: _read(post, "title")?.toString() ?? "",
             content: _read(post, "content")?.toString() ?? "",
-            profileImage: post.user?.profileImage,
+            profileImage: _read(post, "profile_image")?.toString() ??
+                _loggedProfileImage(),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:open_ui/model/createpostshowmodel.dart';
 import 'package:open_ui/model/user_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 
@@ -115,6 +116,8 @@ class CreateProfileApi {
   }
 }
 
+
+
 // =========================
 // POST UPLOAD API
 // =========================
@@ -196,10 +199,23 @@ class MyPostApi {
 /// =========================
 /// POST FETCH API
 /// =========================
+/// =========================
+/// POST FETCH API
+/// =========================
+
 class PostApi {
+  /// ALL POSTS
   static Future<List<Post>> getPosts() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final token = prefs.getString("token");
+
     final res = await http.get(
       Uri.parse("${ApiConfig.baseUrl}/posts"),
+      headers: {
+        if (token != null)
+          "Authorization": "Bearer $token",
+      },
     );
 
     if (res.statusCode != 200) {
@@ -207,9 +223,13 @@ class PostApi {
     }
 
     final data = jsonDecode(res.body) as List;
-    return data.map((e) => Post.fromJson(e)).toList();
+
+    return data
+        .map((e) => Post.fromJson(e))
+        .toList();
   }
 
+  /// LOGGED USER POSTS
   static Future<List<Post>> getMyPosts({
     required String token,
   }) async {
@@ -225,7 +245,35 @@ class PostApi {
     }
 
     final data = jsonDecode(res.body) as List;
-    return data.map((e) => Post.fromJson(e)).toList();
+
+    return data
+        .map((e) => Post.fromJson(e))
+        .toList();
+  }
+
+  /// ANY USER POSTS
+  static Future<List<Post>> getUserPosts({
+    required String token,
+    required int userId,
+  }) async {
+    final res = await http.get(
+      Uri.parse(
+        "${ApiConfig.baseUrl}/user-posts/$userId",
+      ),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load user posts");
+    }
+
+    final data = jsonDecode(res.body) as List;
+
+    return data
+        .map((e) => Post.fromJson(e))
+        .toList();
   }
 }
 
@@ -251,21 +299,46 @@ class PostActionApi {
   }
 
   /// LIKE POST (example endpoint)
-  static Future<void> likePost({
-    required int postId,
-    required String token,
-  }) async {
-    final res = await http.post(
-      Uri.parse("${ApiConfig.baseUrl}/like/$postId"),
-      headers: {
-        "Authorization": "Bearer $token",
-      },
-    );
+static Future<Map<String, dynamic>> likePost({
+  required int postId,
+  required String token,
+}) async {
+  final res = await http.post(
+    Uri.parse("${ApiConfig.baseUrl}/like/$postId"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
 
-    if (res.statusCode != 200) {
-      throw Exception("Like failed");
-    }
+  if (res.statusCode != 200 && res.statusCode != 201) {
+    throw Exception("Like failed: ${res.body}");
   }
+
+  if (res.body.isEmpty) return {};
+
+  return jsonDecode(res.body);
+}
+
+static Future<Map<String, dynamic>> unlikePost({
+  required int postId,
+  required String token,
+}) async {
+  final res = await http.delete(
+    Uri.parse("${ApiConfig.baseUrl}/like/$postId"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (res.statusCode != 200 && res.statusCode != 204) {
+    throw Exception("Unlike failed: ${res.body}");
+  }
+
+  if (res.body.isEmpty) return {};
+
+  return jsonDecode(res.body);
+}
+
 
   /// SAVE POST
   static Future<void> savePost({
@@ -300,6 +373,27 @@ class ProfileShowApi {
 
     return UserModel.fromJson(jsonDecode(response.body));
   }
+
+  static Future<UserModel> getUserProfile({
+  required int userId,
+  required String token,
+}) async {
+  final response = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/user/$userId"),
+    headers: {
+      'Authorization': 'Bearer $token',
+    },
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception("Failed to fetch user profile");
+  }
+
+  return UserModel.fromJson(
+    jsonDecode(response.body),
+  );
+}
+
 }
 
 

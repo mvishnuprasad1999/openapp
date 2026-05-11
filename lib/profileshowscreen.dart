@@ -166,7 +166,7 @@ class ProfileShowScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const MyPostsScreen(),
+                              builder: (_) => const MyPostsScreen(userId: 3,),
                             ),
                           );
                         },

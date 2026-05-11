@@ -5,15 +5,19 @@ import 'package:open_ui/riverpod/auth_provider.dart';
 import 'package:open_ui/riverpod/postshowprovider.dart';
 import 'package:open_ui/services/api_services.dart';
 
-final myPostsProvider =
-    StateNotifierProvider<MyPostsNotifier, AsyncValue<List<Post>>>((ref) {
-  return MyPostsNotifier(ref);
+final myPostsProvider = StateNotifierProvider.family<
+    MyPostsNotifier,
+    AsyncValue<List<Post>>,
+    int>((ref, userId) {
+  return MyPostsNotifier(ref, userId);
 });
 
 class MyPostsNotifier extends StateNotifier<AsyncValue<List<Post>>> {
   final Ref ref;
+  final int userId;
 
-  MyPostsNotifier(this.ref) : super(const AsyncLoading()) {
+  MyPostsNotifier(this.ref, this.userId)
+      : super(const AsyncLoading()) {
     loadPosts();
   }
 
@@ -24,27 +28,42 @@ class MyPostsNotifier extends StateNotifier<AsyncValue<List<Post>>> {
       final auth = ref.read(authProvider);
 
       if (auth.token == null) {
-        state = AsyncError("No token", StackTrace.current);
+        state = AsyncError(
+          "No token",
+          StackTrace.current,
+        );
         return;
       }
 
-      final data = await MyPostApi.getMyPosts(token: auth.token!);
+      /// FETCH POSTS OF SPECIFIC USER
+      final data = await PostApi.getUserPosts(
+        token: auth.token!,
+        userId: userId,
+      );
+
       state = AsyncData(data);
     } catch (e) {
-      state = AsyncError(e, StackTrace.current);
+      state = AsyncError(
+        e,
+        StackTrace.current,
+      );
     }
   }
 
   Future<void> deletePost(int postId) async {
     final previousState = state;
+
     final auth = ref.read(authProvider);
 
     if (auth.token == null) {
       throw Exception("No token");
     }
 
+    /// OPTIMISTIC DELETE
     state = state.whenData(
-      (posts) => posts.where((post) => post.id != postId).toList(),
+      (posts) => posts
+          .where((post) => post.id != postId)
+          .toList(),
     );
 
     try {
@@ -53,6 +72,7 @@ class MyPostsNotifier extends StateNotifier<AsyncValue<List<Post>>> {
         token: auth.token!,
       );
 
+      /// REFRESH HOME POSTS
       ref.invalidate(postsProvider);
     } catch (e) {
       state = previousState;
