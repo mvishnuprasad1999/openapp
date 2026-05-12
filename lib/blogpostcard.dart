@@ -456,7 +456,6 @@
 //   }
 // }
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -513,7 +512,9 @@ class _BlogPosImagetCardState extends ConsumerState<BlogPosImagetCard> {
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           for (final post in sortedPosts) {
-            ref.read(likeStateProvider.notifier).init(
+            ref
+                .read(likeStateProvider.notifier)
+                .init(
                   post.id,
                   isLiked: post.isLiked,
                   likeCount: post.likesCount,
@@ -543,11 +544,7 @@ class _PostCard extends ConsumerStatefulWidget {
   final dynamic post;
   final int loggedUserId;
 
-  const _PostCard({
-    super.key,
-    required this.post,
-    required this.loggedUserId,
-  });
+  const _PostCard({super.key, required this.post, required this.loggedUserId});
 
   @override
   ConsumerState<_PostCard> createState() => _PostCardState();
@@ -561,12 +558,16 @@ class _PostCardState extends ConsumerState<_PostCard> {
   @override
   void initState() {
     super.initState();
-    _controller = PageController(viewportFraction: 1);
+    // ✅ FIX 1: removed viewportFraction (defaults to 1.0) — explicit 1.0
+    //           causes sub-pixel rounding that stutters; omitting it is cleaner.
+    _controller = PageController();
+    // ✅ FIX 2: listener drives the indicator; no setState needed in onPageChanged.
     _controller.addListener(() {
       if (!mounted) return;
-      setState(() {
-        _currentPage = _controller.page ?? 0;
-      });
+      final page = _controller.page ?? 0;
+      if ((page - _currentPage).abs() > 0.001) {
+        setState(() => _currentPage = page);
+      }
     });
   }
 
@@ -625,8 +626,7 @@ class _PostCardState extends ConsumerState<_PostCard> {
 
       likeNotifier.update(
         postId,
-        isLiked:
-            updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
+        isLiked: updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
         likeCount: updatedLikeCount != null
             ? _toInt(updatedLikeCount)
             : (wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1),
@@ -638,8 +638,9 @@ class _PostCardState extends ConsumerState<_PostCard> {
         likeNotifier.update(postId, isLiked: wasLiked, likeCount: oldCount);
       }
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLikeLoading = false);
     }
@@ -657,8 +658,7 @@ class _PostCardState extends ConsumerState<_PostCard> {
           color: Colors.transparent,
           child: Center(
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.85),
                 borderRadius: BorderRadius.circular(30),
@@ -692,7 +692,6 @@ class _PostCardState extends ConsumerState<_PostCard> {
     final post = widget.post;
     final postId = post.id as int;
 
-    // Author ID — comes from post.user.id (the person who wrote this post)
     final int authorId = post.user?.id ?? postId;
 
     final likeMap = ref.watch(likeStateProvider);
@@ -712,59 +711,68 @@ class _PostCardState extends ConsumerState<_PostCard> {
             children: [
               Container(
                 margin: const EdgeInsets.all(5.0),
-                height: 200,
-                width: double.infinity,
-                child: ClipRRect(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey, width: 2),
                   borderRadius: BorderRadius.circular(38),
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _controller,
-                        physics: const PageScrollPhysics(),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: images.length,
-                        onPageChanged: (value) {
-                          setState(() {
-                            _currentPage = value.toDouble();
-                          });
-                        },
-                        itemBuilder: (context, imgIndex) {
-                          final img = images[imgIndex].toString();
-                          return _isNetworkImage(img)
-                              ? Image.network(
-                                  img,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                  filterQuality: FilterQuality.high,
-                                )
-                              : Image.asset(
-                                  img,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                  filterQuality: FilterQuality.high,
-                                );
-                        },
-                      ),
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.black.withOpacity(0.15),
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.55),
-                                ],
+                ),
+                child: SizedBox(
+                  height: 220,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(36),
+                    child: Stack(
+                      children: [
+                        PageView.builder(
+                          controller: _controller,
+                          // ✅ FIX 3: BouncingScrollPhysics gives a natural,
+                          //           fluid feel; no janky snapping.
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: images.length,
+                          // ✅ FIX 4: onPageChanged REMOVED — the controller
+                          //           listener above already updates _currentPage
+                          //           every frame, so a second setState here was
+                          //           causing a double-rebuild that broke smoothness.
+                          itemBuilder: (context, imgIndex) {
+                            final img = images[imgIndex].toString();
+                            return _isNetworkImage(img)
+                                ? Image.network(
+                                    img,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.high,
+                                  )
+                                : Image.asset(
+                                    img,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.high,
+                                  );
+                          },
+                        ),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  colors: [
+                                    Colors.black.withOpacity(0.15),
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.55),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -781,8 +789,9 @@ class _PostCardState extends ConsumerState<_PostCard> {
                         return GestureDetector(
                           onTap: () async {
                             try {
-                              final notifier =
-                                  ref.read(savedPostsProvider.notifier);
+                              final notifier = ref.read(
+                                savedPostsProvider.notifier,
+                              );
                               await notifier.savePost(post.id);
                               ref.invalidate(savedPostsListProvider);
                               if (!context.mounted) return;
@@ -909,15 +918,13 @@ class _PostCardState extends ConsumerState<_PostCard> {
               ),
             ],
           ),
-
-          // ✅ authorId = who wrote the post → tapping avatar opens THEIR profile
           BlogContentCard(
-  userId: post.user?.id ?? 0,
-  source: post.username,
-  title: post.title,
-  content: post.content,
-  profileImage: post.profileImage,
-),
+            userId: post.user?.id ?? 0,
+            source: post.username,
+            title: post.title,
+            content: post.content,
+            profileImage: post.profileImage,
+          ),
         ],
       ),
     );

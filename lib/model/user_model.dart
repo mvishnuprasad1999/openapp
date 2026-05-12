@@ -7,6 +7,8 @@ class UserModel {
   final String? profileTitle;
   final String? profileDescription;
 
+  final List<dynamic>? posts; // ✅ REQUIRED
+
   UserModel({
     required this.id,
     required this.email,
@@ -15,17 +17,21 @@ class UserModel {
     this.profileImage,
     this.profileTitle,
     this.profileDescription,
+    this.posts,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
       email: json['email'],
-      name:json['name'],
+      name: json['name'],
       username: json['username'],
-      profileImage: json['profile_image'],
+      profileImage: json['image_url'], // or profile_image (your backend)
       profileTitle: json['profile_title'],
       profileDescription: json['profile_description'],
+
+      // ✅ IMPORTANT
+      posts: json['posts'] ?? [],
     );
   }
 }

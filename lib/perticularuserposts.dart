@@ -1,37 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:open_ui/services/api_services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:open_ui/model/user_model.dart';
+import 'package:open_ui/riverpod/Perticular_profile_show_provider.dart';
 import 'package:open_ui/riverpod/likestaeprovider.dart';
-import 'package:open_ui/riverpod/mypost_provider.dart';
 import 'package:open_ui/riverpod/postshowprovider.dart';
+import 'package:open_ui/services/api_services.dart';
 import 'package:open_ui/widgets/blogpostshimmer.dart';
-import 'package:open_ui/widgets/bottombar.dart';
 
 import 'blopostcontentcard.dart';
 
-
-
-class MyPostsScreen extends ConsumerWidget {
+class UserPostsScreen extends ConsumerWidget {
   final int userId;
 
-  const MyPostsScreen({
+  const UserPostsScreen({
     super.key,
     required this.userId,
   });
 
-  Future<UserModel?> _getLoggedUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString("token");
-    if (token == null || token.isEmpty) return null;
-    return ProfileShowApi.getProfile(token);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(profileShowProvider(userId));
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -63,34 +55,26 @@ class MyPostsScreen extends ConsumerWidget {
           ),
         ),
         title: const Text(
-          "My Posts",
+          "User Posts",
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
       ),
+      body: profileAsync.when(
+        loading: () => const BlogPostShimmer(),
 
-      body: FutureBuilder<UserModel?>(
-        future: _getLoggedUser(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const BlogPostShimmer();
-          }
+        error: (e, _) => Center(
+          child: Text(
+            e.toString(),
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
 
-          if (!snapshot.hasData || snapshot.data == null) {
-            return const Center(
-              child: Text(
-                "Failed to load profile",
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          }
+        data: (user) {
+          final posts = user.posts ?? [];
 
-          final loggedUser = snapshot.data!;
-          final posts = loggedUser.posts ?? [];
-
-          // ✅ init like states for all posts
           WidgetsBinding.instance.addPostFrameCallback((_) {
             for (final post in posts) {
               final postId = post is Map
@@ -98,9 +82,11 @@ class MyPostsScreen extends ConsumerWidget {
                       ? post["id"] as int
                       : int.tryParse(post["id"].toString()) ?? 0)
                   : (post.id is int ? post.id as int : 0);
+
               final isLiked = post is Map
                   ? post["is_liked"] == true
                   : (post.isLiked ?? false);
+
               final likeCount = post is Map
                   ? (post["likes_count"] is int
                       ? post["likes_count"] as int
@@ -108,6 +94,7 @@ class MyPostsScreen extends ConsumerWidget {
                               post["likes_count"]?.toString() ?? "0") ??
                           0)
                   : (post.likesCount ?? 0);
+
               ref.read(likeStateProvider.notifier).init(
                     postId,
                     isLiked: isLiked,
@@ -116,34 +103,29 @@ class MyPostsScreen extends ConsumerWidget {
             }
           });
 
-          return Stack(
-            children: [
-              posts.isEmpty
-                  ? const Center(
-                      child: Text(
-                        "No posts yet",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        await _getLoggedUser();
-                      },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 120),
-                        itemCount: posts.length,
-                        itemBuilder: (context, i) {
-                          return _MyPostCard(
-                            post: posts[i],
-                            loggedUser: loggedUser,
-                            fallbackUserId: userId,
-                          );
-                        },
-                      ),
-                    ),
+          if (posts.isEmpty) {
+            return const Center(
+              child: Text(
+                "No posts yet",
+                style: TextStyle(color: Colors.white),
+              ),
+            );
+          }
 
-              const CustomBottomBar(selectedIndex: 3),
-            ],
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(profileShowProvider(userId));
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.only(bottom: 40),
+              itemCount: posts.length,
+              itemBuilder: (context, i) {
+                return _UserPostCard(
+                  post: posts[i],
+                  user: user,
+                );
+              },
+            ),
           );
         },
       ),
@@ -151,38 +133,38 @@ class MyPostsScreen extends ConsumerWidget {
   }
 }
 
-class _MyPostCard extends ConsumerStatefulWidget {
+class _UserPostCard extends ConsumerStatefulWidget {
   final dynamic post;
-  final UserModel? loggedUser;
-  final int fallbackUserId;
+  final UserModel user;
 
-  const _MyPostCard({
+  const _UserPostCard({
     required this.post,
-    required this.loggedUser,
-    required this.fallbackUserId,
+    required this.user,
   });
 
   @override
-  ConsumerState<_MyPostCard> createState() => _MyPostCardState();
+  ConsumerState<_UserPostCard> createState() => _UserPostCardState();
 }
 
-class _MyPostCardState extends ConsumerState<_MyPostCard> {
+class _UserPostCardState extends ConsumerState<_UserPostCard> {
   late final PageController _controller;
   double _currentPage = 0;
-  bool _isDeleting = false;
-  bool _isLikeLoading = false; // ✅ added
+  bool _isLikeLoading = false;
 
-  late final int _postId; // ✅ added
+  late final int _postId;
 
   @override
   void initState() {
     super.initState();
+
     _controller = PageController(viewportFraction: 1);
 
-    // ✅ resolve postId once
     final post = widget.post;
     final raw = _read(post, "id");
-    _postId = raw is int ? raw : int.tryParse(raw?.toString() ?? "") ?? 0;
+
+    _postId = raw is int
+        ? raw
+        : int.tryParse(raw?.toString() ?? "") ?? 0;
   }
 
   @override
@@ -193,34 +175,50 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
 
   dynamic _read(dynamic obj, String key) {
     if (obj is Map) return obj[key];
+
     try {
       switch (key) {
         case "id":
           return obj.id;
+
         case "title":
           return obj.title;
+
         case "content":
           return obj.content;
+
         case "images":
           return obj.images;
+
         case "likes_count":
           return obj.likesCount;
+
+        case "is_liked":
+          return obj.isLiked;
+
         case "username":
           return obj.username;
+
         case "profile_image":
           return obj.profileImage;
+
         case "user":
           return obj.user;
       }
     } catch (_) {}
+
     return null;
   }
 
   List<String> _images(dynamic raw) {
     if (raw is! List || raw.isEmpty) return [];
+
     return raw
         .map<String>((img) {
-          if (img is Map) return img["image_url"]?.toString() ?? "";
+          if (img is Map) {
+            return img["image_url"]?.toString() ?? "";
+          }
+
           try {
             return img.imageUrl?.toString() ?? "";
           } catch (_) {
@@ -231,56 +229,14 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
         .toList();
   }
 
-  int _loggedUserId() {
-    final loggedUser = widget.loggedUser;
-    final id = loggedUser == null ? null : _read(loggedUser, "id");
-    if (id is int) return id;
-    if (id != null) return int.tryParse(id.toString()) ?? widget.fallbackUserId;
-    return widget.fallbackUserId;
-  }
-
-  String _loggedUsername() {
-    final loggedUser = widget.loggedUser;
-    if (loggedUser == null) return "Unknown";
-    return _read(loggedUser, "username")?.toString() ?? "Unknown";
-  }
-
-  String? _loggedProfileImage() {
-    final loggedUser = widget.loggedUser;
-    if (loggedUser == null) return null;
-    return _read(loggedUser, "profile_image")?.toString();
-  }
-
-  int _authorId() {
-    final post = widget.post;
-    try {
-      final user = post.user;
-      if (user != null) {
-        final id = user.id;
-        if (id is int) return id;
-        return int.tryParse(id.toString()) ?? _loggedUserId();
-      }
-    } catch (_) {}
-    if (post is Map) {
-      final user = post["user"];
-      if (user is Map) {
-        final id = user["id"];
-        if (id is int) return id;
-        return int.tryParse(id?.toString() ?? "") ?? _loggedUserId();
-      }
-      final uid = post["user_id"];
-      if (uid is int) return uid;
-      return int.tryParse(uid?.toString() ?? "") ?? _loggedUserId();
-    }
-    return _loggedUserId();
-  }
-
-  // ✅ same toggleLike as SavedPostsScreen
   Future<void> _toggleLike(BuildContext context) async {
     if (_isLikeLoading) return;
 
     final likeNotifier = ref.read(likeStateProvider.notifier);
-    final currentState = ref.read(likeStateProvider)[_postId];
+
+    final currentState =
+        ref.read(likeStateProvider)[_postId];
+
     if (currentState == null) return;
 
     final wasLiked = currentState.isLiked;
@@ -289,95 +245,95 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
     likeNotifier.update(
       _postId,
       isLiked: !wasLiked,
-      likeCount: wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1,
+      likeCount:
+          wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1,
     );
 
     setState(() => _isLikeLoading = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
+
       final token = prefs.getString("token");
-      if (token == null) throw Exception("User not logged in");
+
+      if (token == null) {
+        throw Exception("User not logged in");
+      }
 
       final result = wasLiked
-          ? await PostActionApi.unlikePost(postId: _postId, token: token)
-          : await PostActionApi.likePost(postId: _postId, token: token);
+          ? await PostActionApi.unlikePost(
+              postId: _postId,
+              token: token,
+            )
+          : await PostActionApi.likePost(
+              postId: _postId,
+              token: token,
+            );
 
       final updatedLikeCount =
-          result["likes_count"] ?? result["likesCount"] ?? result["like_count"];
-      final updatedIsLiked =
-          result["is_liked"] ?? result["isLiked"] ?? result["liked"];
+          result["likes_count"] ??
+              result["likesCount"] ??
+              result["like_count"];
 
-      if (!mounted) return;
+      final updatedIsLiked =
+          result["is_liked"] ??
+              result["isLiked"] ??
+              result["liked"];
 
       likeNotifier.update(
         _postId,
-        isLiked: updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
-        likeCount: updatedLikeCount != null
-            ? (updatedLikeCount is int
-                ? updatedLikeCount
-                : int.tryParse(updatedLikeCount.toString()) ?? oldCount)
-            : (wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1),
+        isLiked: updatedIsLiked == true,
+        likeCount: updatedLikeCount is int
+            ? updatedLikeCount
+            : int.tryParse(updatedLikeCount.toString()) ??
+                oldCount,
       );
 
       ref.invalidate(postsProvider);
     } catch (e) {
-      if (mounted) {
-        likeNotifier.update(_postId, isLiked: wasLiked, likeCount: oldCount);
-      }
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      if (mounted) setState(() => _isLikeLoading = false);
-    }
-  }
-
-  Future<void> _delete(int postId) async {
-    if (_isDeleting) return;
-    setState(() => _isDeleting = true);
-    try {
-      await ref
-          .read(myPostsProvider(_loggedUserId()).notifier)
-          .deletePost(postId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 10),
-              Text("Post deleted"),
-            ],
-          ),
-          backgroundColor: Colors.black,
-        ),
+      likeNotifier.update(
+        _postId,
+        isLiked: wasLiked,
+        likeCount: oldCount,
       );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isDeleting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Delete failed: $e")));
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLikeLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
-    final images = _images(_read(post, "images"));
-    final count = images.isEmpty ? 1 : images.length;
-    final postId = _read(post, "id");
 
-    // ✅ read live like state from provider
+    final images = _images(_read(post, "images"));
+
+    final count = images.isEmpty ? 1 : images.length;
+
     final likeMap = ref.watch(likeStateProvider);
+
     final likeState = likeMap[_postId];
-    final isLiked = likeState?.isLiked ?? (_read(post, "is_liked") == true);
-    final likeCount = likeState?.likeCount ??
-        ((_read(post, "likes_count") is int
-                ? _read(post, "likes_count") as int
-                : int.tryParse(
-                        _read(post, "likes_count")?.toString() ?? "0")) ??
-            0);
+
+    final isLiked =
+        likeState?.isLiked ??
+            (_read(post, "is_liked") == true);
+
+    final likeCount =
+        likeState?.likeCount ??
+            ((_read(post, "likes_count") is int
+                    ? _read(post, "likes_count") as int
+                    : int.tryParse(
+                            _read(post, "likes_count")
+                                    ?.toString() ??
+                                "0") ??
+                        0));
 
     return Padding(
       padding: const EdgeInsets.all(2),
@@ -402,8 +358,6 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                             )
                           : PageView.builder(
                               controller: _controller,
-                              physics: const PageScrollPhysics(),
-                              scrollDirection: Axis.horizontal,
                               itemCount: images.length,
                               onPageChanged: (value) {
                                 setState(() {
@@ -416,28 +370,16 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                                   width: double.infinity,
                                   height: double.infinity,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Image.asset(
-                                    "assets/images/blogpostcardsample.png",
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                  loadingBuilder:
-                                      (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Container(
-                                      color: Colors.grey[900],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.pink,
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
+                                  errorBuilder: (_, __, ___) {
+                                    return Image.asset(
+                                      "assets/images/blogpostcardsample.png",
+                                      fit: BoxFit.cover,
                                     );
                                   },
                                 );
                               },
                             ),
+
                       Positioned.fill(
                         child: IgnorePointer(
                           child: DecoratedBox(
@@ -459,38 +401,12 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                   ),
                 ),
               ),
+
               Positioned(
                 top: 28,
                 right: 18,
                 child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: postId == null || _isDeleting
-                          ? null
-                          : () => _delete(postId),
-                      child: SizedBox(
-                        height: 42,
-                        width: 42,
-                        child: Center(
-                          child: _isDeleting
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.pink,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : SvgPicture.asset(
-                                  "assets/images/deletepost.svg",
-                                  height: 42,
-                                  width: 42,
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    // ✅ interactive like button (same as SavedPostsScreen)
                     Column(
                       children: [
                         GestureDetector(
@@ -503,7 +419,8 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                                   ? const SizedBox(
                                       height: 24,
                                       width: 24,
-                                      child: CircularProgressIndicator(
+                                      child:
+                                          CircularProgressIndicator(
                                         color: Colors.blue,
                                         strokeWidth: 2,
                                       ),
@@ -522,7 +439,9 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                             ),
                           ),
                         ),
+
                         const SizedBox(height: 5),
+
                         Text(
                           likeCount.toString(),
                           style: const TextStyle(
@@ -536,6 +455,7 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                   ],
                 ),
               ),
+
               Positioned(
                 bottom: 20,
                 left: 125,
@@ -543,8 +463,11 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final totalWidth = constraints.maxWidth;
-                    final segmentWidth =
-                        count == 1 ? totalWidth : totalWidth / count;
+
+                    final segmentWidth = count == 1
+                        ? totalWidth
+                        : totalWidth / count;
+
                     return Stack(
                       children: [
                         Container(
@@ -552,19 +475,25 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
                           width: totalWidth,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius:
+                                BorderRadius.circular(10),
                           ),
                         ),
+
                         AnimatedPositioned(
-                          duration: const Duration(milliseconds: 250),
+                          duration:
+                              const Duration(milliseconds: 250),
                           curve: Curves.easeOut,
-                          left: count == 1 ? 0 : _currentPage * segmentWidth,
+                          left: count == 1
+                              ? 0
+                              : _currentPage * segmentWidth,
                           child: Container(
                             height: 3,
                             width: segmentWidth,
                             decoration: BoxDecoration(
                               color: Colors.pink,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius:
+                                  BorderRadius.circular(10),
                             ),
                           ),
                         ),
@@ -577,12 +506,11 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
           ),
 
           BlogContentCard(
-            userId: _authorId(),
-            source: _read(post, "username")?.toString() ?? _loggedUsername(),
+            userId: widget.user.id ?? 0,
+            source: widget.user.username ?? "",
             title: _read(post, "title")?.toString() ?? "",
             content: _read(post, "content")?.toString() ?? "",
-            profileImage: _read(post, "profile_image")?.toString() ??
-                _loggedProfileImage(),
+            profileImage: widget.user.profileImage,
           ),
         ],
       ),

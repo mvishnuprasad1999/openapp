@@ -252,14 +252,12 @@ class PostApi {
   }
 
   /// ANY USER POSTS
-  static Future<List<Post>> getUserPosts({
+static Future<List<Post>> getUserPosts({
     required String token,
     required int userId,
   }) async {
     final res = await http.get(
-      Uri.parse(
-        "${ApiConfig.baseUrl}/user-posts/$userId",
-      ),
+      Uri.parse("${ApiConfig.baseUrl}/user-posts/$userId"),
       headers: {
         "Authorization": "Bearer $token",
       },
@@ -271,9 +269,7 @@ class PostApi {
 
     final data = jsonDecode(res.body) as List;
 
-    return data
-        .map((e) => Post.fromJson(e))
-        .toList();
+    return data.map((e) => Post.fromJson(e)).toList();
   }
 }
 
@@ -360,42 +356,54 @@ static Future<Map<String, dynamic>> unlikePost({
 // =========================
 // PROFILE SHOW API
 // =========================
+// =========================
+// PROFILE SHOW API
+// =========================
+
 class ProfileShowApi {
+
+  /// LOGGED-IN USER PROFILE
   static Future<UserModel> getProfile(String token) async {
     final response = await http.get(
       Uri.parse("${ApiConfig.baseUrl}/me"),
-      headers: {'Authorization': 'Bearer $token'},
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
     );
 
     if (response.statusCode != 200) {
       throw Exception("Failed to fetch profile");
     }
 
-    return UserModel.fromJson(jsonDecode(response.body));
+    return UserModel.fromJson(
+      jsonDecode(response.body),
+    );
   }
 
+  /// PARTICULAR USER PROFILE
   static Future<UserModel> getUserProfile({
-  required int userId,
-  required String token,
-}) async {
-  final response = await http.get(
-    Uri.parse("${ApiConfig.baseUrl}/user/$userId"),
-    headers: {
-      'Authorization': 'Bearer $token',
-    },
-  );
+    required int userId,
+    required String token,
+  }) async {
 
-  if (response.statusCode != 200) {
-    throw Exception("Failed to fetch user profile");
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/user/$userId"),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        "Failed to fetch user profile: ${response.body}",
+      );
+    }
+
+    return UserModel.fromJson(
+      jsonDecode(response.body),
+    );
   }
-
-  return UserModel.fromJson(
-    jsonDecode(response.body),
-  );
 }
-
-}
-
 
 // =========================
 // Save and Unsave Api
