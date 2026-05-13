@@ -7,7 +7,9 @@ class UserModel {
   final String? profileTitle;
   final String? profileDescription;
 
-  final List<dynamic>? posts; // ✅ REQUIRED
+  final List<dynamic>? posts;
+
+  final bool isFollowing;
 
   UserModel({
     required this.id,
@@ -18,20 +20,35 @@ class UserModel {
     this.profileTitle,
     this.profileDescription,
     this.posts,
+    required this.isFollowing,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return UserModel(
-      id: json['id'],
-      email: json['email'],
+      id: json['id'] ?? 0,
+
+      email: json['email'] ?? "",
+
       name: json['name'],
       username: json['username'],
-      profileImage: json['image_url'], // or profile_image (your backend)
-      profileTitle: json['profile_title'],
-      profileDescription: json['profile_description'],
 
-      // ✅ IMPORTANT
+      /// FIXED HERE
+      profileImage:
+          json['image_url'] ??
+          json['profile_image'],
+
+      profileTitle:
+          json['profile_title'],
+
+      profileDescription:
+          json['profile_description'],
+
       posts: json['posts'] ?? [],
+
+      isFollowing:
+          json['is_following'] ?? false,
     );
   }
 }

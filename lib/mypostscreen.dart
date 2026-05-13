@@ -577,6 +577,7 @@ class _MyPostCardState extends ConsumerState<_MyPostCard> {
           ),
 
           BlogContentCard(
+            // initiallyFollowing: post.isFollowing,
             userId: _authorId(),
             source: _read(post, "username")?.toString() ?? _loggedUsername(),
             title: _read(post, "title")?.toString() ?? "",

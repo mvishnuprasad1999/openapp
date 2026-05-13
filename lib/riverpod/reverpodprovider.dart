@@ -1,59 +1,62 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:open_ui/model/user_model.dart';
+import 'package:open_ui/services/api_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class BlogChunkParams {
-  final String content;
-  final double maxWidth;
+final followingProvider =
+    StateNotifierProvider<FollowingNotifier, List<UserModel>>(
+  (ref) => FollowingNotifier(),
+);
 
-  BlogChunkParams({
-    required this.content,
-    required this.maxWidth,
-  });
-}
+class FollowingNotifier extends StateNotifier<List<UserModel>> {
+  FollowingNotifier() : super([]) {
+    loadFollowing();
+  }
 
-final blogChunkProvider =
-    Provider.family<List<String>, BlogChunkParams>((ref, params) {
-  return _chunkText(params.content, params.maxWidth);
-});
+  void addFollowingUser(UserModel user) {
+    final alreadyExists = state.any((item) => item.id == user.id);
 
-List<String> _chunkText(String content, double maxWidth) {
-  const int maxLines = 12;
+    if (alreadyExists) return;
 
-  final words = content.split(' ');
-  final chunks = <String>[];
+    state = [user, ...state];
+  }
 
-  final tp = TextPainter(
-    textDirection: TextDirection.ltr,
-    maxLines: maxLines,
-  );
+  Future<void> loadFollowing() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-  String current = '';
+      final token = prefs.getString("token");
 
-  const textStyle = TextStyle(
-    fontSize: 13,
-    height: 1.4,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.25,
-    color: Color(0xFF374151),
-  );
+      if (token == null) return;
 
-  for (final word in words) {
-    final test = current.isEmpty ? word : '$current $word';
+      final users = await FollowApi.getFollowingUsers(
+        token: token,
+      );
 
-    tp.text = TextSpan(text: test, style: textStyle);
-    tp.layout(maxWidth: maxWidth);
-
-    if (tp.didExceedMaxLines) {
-      chunks.add(current.trim());
-      current = word;
-    } else {
-      current = test;
+      state = users;
+    } catch (e) {
+      print(e);
     }
   }
 
-  if (current.isNotEmpty) {
-    chunks.add(current.trim());
-  }
+  Future<void> unfollowUser(int userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-  return chunks;
+      final token = prefs.getString("token");
+
+      if (token == null) return;
+
+      state = state.where((user) => user.id != userId).toList();
+
+      await FollowApi.unfollowUser(
+        userId: userId,
+        token: token,
+      );
+      await loadFollowing();
+      
+    } catch (e) {
+      print(e);
+    }
+  }
 }

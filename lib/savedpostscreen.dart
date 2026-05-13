@@ -107,14 +107,17 @@ class _SavedPostsScreenState extends ConsumerState<SavedPostsScreen> {
                   final postId = post["id"] is int
                       ? post["id"] as int
                       : int.tryParse(post["id"].toString()) ?? 0;
-                  ref.read(likeStateProvider.notifier).init(
+                  ref
+                      .read(likeStateProvider.notifier)
+                      .init(
                         postId,
                         isLiked: post["is_liked"] == true,
                         likeCount: post["likes_count"] is int
                             ? post["likes_count"] as int
                             : int.tryParse(
-                                    post["likes_count"]?.toString() ?? "0") ??
-                                0,
+                                    post["likes_count"]?.toString() ?? "0",
+                                  ) ??
+                                  0,
                       );
                 }
               });
@@ -228,8 +231,7 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
           color: Colors.transparent,
           child: Center(
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.85),
                 borderRadius: BorderRadius.circular(30),
@@ -294,8 +296,7 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
 
       likeNotifier.update(
         _postId,
-        isLiked:
-            updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
+        isLiked: updatedIsLiked != null ? updatedIsLiked == true : !wasLiked,
         likeCount: updatedLikeCount != null
             ? _toInt(updatedLikeCount)
             : (wasLiked ? (oldCount - 1).clamp(0, 999999) : oldCount + 1),
@@ -307,8 +308,9 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
         likeNotifier.update(_postId, isLiked: wasLiked, likeCount: oldCount);
       }
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLikeLoading = false);
     }
@@ -339,8 +341,9 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isUnsaving = false);
     }
@@ -401,11 +404,11 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) =>
                                   Image.asset(
-                                "assets/images/blogpostcardsample.png",
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
+                                    "assets/images/blogpostcardsample.png",
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                             );
                           },
                         ),
@@ -549,16 +552,17 @@ class _SavedPostCardState extends ConsumerState<_SavedPostCard> {
           ),
 
           // ✅ loggedUserId = who is viewing, authorId = who wrote the post
-       BlogContentCard(
-  userId: authorId,              // already computed above as _toInt(post["user"]["id"])
-  source: post["user"]?["username"] ?? post["username"] ?? "Unknown",
-  title: post["title"] ?? "",
-  content: post["content"] ?? "",
-  profileImage: post["user"]?["profile_image"],
-),
+          BlogContentCard(
+            // initiallyFollowing: post.isFollowing,
+            userId:
+                authorId, // already computed above as _toInt(post["user"]["id"])
+            source: post["user"]?["username"] ?? post["username"] ?? "Unknown",
+            title: post["title"] ?? "",
+            content: post["content"] ?? "",
+            profileImage: post["user"]?["profile_image"],
+          ),
         ],
       ),
     );
   }
 }
-

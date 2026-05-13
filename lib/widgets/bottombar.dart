@@ -164,11 +164,12 @@
 //   }
 // }
 
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:open_ui/folloedusershow.dart';
 import 'package:open_ui/mypostscreen.dart';
+import 'package:open_ui/otheruserfollowed.dart';
 import 'package:open_ui/perticularuserprofile.dart';
 import 'package:open_ui/profileshowscreen.dart';
 import 'package:open_ui/savedpostscreen.dart';
@@ -185,12 +186,11 @@ class CustomBottomBar extends StatefulWidget {
 
 class _CustomBottomBarState extends State<CustomBottomBar>
     with SingleTickerProviderStateMixin {
-
   static const Color glassBlue = Color(0xFF2F88FF);
-  static const Color redIcon   = Color(0xFFFF2D2D);
+  static const Color redIcon = Color(0xFFFF2D2D);
 
   late AnimationController _pulse;
-  late Animation<double>   _pulseAnim;
+  late Animation<double> _pulseAnim;
 
   final List<String> inactiveIcons = [
     "assets/images/h1.svg",
@@ -215,9 +215,10 @@ class _CustomBottomBarState extends State<CustomBottomBar>
       vsync: this,
       duration: const Duration(milliseconds: 2800),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.92, end: 1.08).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(
+      begin: 0.92,
+      end: 1.08,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
   }
 
   @override
@@ -238,7 +239,10 @@ class _CustomBottomBarState extends State<CustomBottomBar>
         );
         break;
       case 1:
-      
+        // Navigator.push(
+        //   context,
+        //   MaterialPageRoute(builder: (_) => const FollowingScreen()),
+        // );
         break;
       case 2:
         Navigator.push(
@@ -253,19 +257,18 @@ class _CustomBottomBarState extends State<CustomBottomBar>
         );
         break;
       case 4:
-        // TODO: Profile page
         break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final sel       = widget.selectedIndex;
-    final barWidth  = MediaQuery.of(context).size.width * 0.82;
+    final sel = widget.selectedIndex;
+    final barWidth = MediaQuery.of(context).size.width * 0.82;
     final itemWidth = barWidth / inactiveIcons.length;
-    const barH      = 74.0;
-    const bubbleD   = 66.0;
-    const lift      = 16.0;
+    const barH = 74.0;
+    const bubbleD = 66.0;
+    const lift = 16.0;
 
     return Positioned(
       bottom: 20,
@@ -278,7 +281,6 @@ class _CustomBottomBarState extends State<CustomBottomBar>
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-
               // ── Frosted glass bar ─────────────────────────────────────
               Positioned(
                 bottom: 0,
@@ -338,7 +340,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                                   onTap: () => onItemTapped(i),
                                   child: Center(
                                     child: AnimatedOpacity(
-                                      duration: const Duration(milliseconds: 180),
+                                      duration: const Duration(
+                                        milliseconds: 180,
+                                      ),
                                       opacity: sel == i ? 0.0 : 1.0,
                                       child: SvgPicture.asset(
                                         inactiveIcons[i],
@@ -371,7 +375,6 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-
                         // pulsing blue glow ring
                         AnimatedBuilder(
                           animation: _pulseAnim,
@@ -404,7 +407,9 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                                 shape: BoxShape.circle,
                                 color: glassBlue.withOpacity(0.30),
                                 border: Border.all(
-                                  color: const Color(0xFF64BEFF).withOpacity(0.60),
+                                  color: const Color(
+                                    0xFF64BEFF,
+                                  ).withOpacity(0.60),
                                   width: 1.5,
                                 ),
                                 boxShadow: [
@@ -452,13 +457,11 @@ class _CustomBottomBarState extends State<CustomBottomBar>
                           //   BlendMode.srcIn,
                           // ),
                         ),
-
                       ],
                     ),
                   ),
                 ),
               ),
-
             ],
           ),
         ),

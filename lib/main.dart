@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 // import 'package:open_ui/aichatscreen.dart';
 import 'package:open_ui/authenticationscreen.dart';
+import 'package:open_ui/taskscreen.dart';
 // import 'package:open_ui/widgets/blogpostshimmer.dart';
 // import 'package:open_ui/postupload.dart';
 // import 'package:open_ui/userprofile.dart';
@@ -31,14 +32,14 @@ class MyApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: Colors.black,
       ),
-      home:
+      // home: const TaskScreen()
       // PostUploadScreen(),
       // ProfileSetupScreen(),
       // ProfileShowScreen(),
       // CompanionScreen(),
       // BlogPostShimmer(),
 
-      const AuthScreen(isLogin: false), // ← start on auth screen
+      home: const AuthScreen(isLogin: false), // ← start on auth screen
     );
   }
 }

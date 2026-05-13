@@ -196,9 +196,7 @@ class MyPostApi {
     return data.map((e) => Post.fromJson(e)).toList();
   }
 }
-/// =========================
-/// POST FETCH API
-/// =========================
+
 /// =========================
 /// POST FETCH API
 /// =========================
@@ -404,6 +402,87 @@ class ProfileShowApi {
     );
   }
 }
+// =========================
+// FOLLOW API,unfollow,user id based follower get
+// =========================
+
+class FollowApi {
+  static Future<Map<String, dynamic>> followUser({
+    required int userId,
+    required String token,
+  }) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/follow/$userId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception("Failed to follow user: ${response.body}");
+    }
+
+    if (response.body.isEmpty) return {};
+
+    return jsonDecode(response.body);
+  }
+
+static Future<void> unfollowUser({
+  required int userId,
+  required String token,
+}) async {
+  final response = await http.delete(
+    Uri.parse("${ApiConfig.baseUrl}/follow/$userId"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (response.statusCode != 200 && response.statusCode != 204) {
+    throw Exception(
+      "Failed to unfollow user: ${response.statusCode} ${response.body}",
+    );
+  }
+}
+
+  static Future<List<UserModel>> getFollowingUsers({
+    required String token,
+  }) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/following"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to load following users: ${response.body}");
+    }
+
+    final data = jsonDecode(response.body) as List;
+
+    return data.map((e) => UserModel.fromJson(e)).toList();
+  }
+
+static Future<List<UserModel>> getUserFollowing({
+  required int userId,
+  required String token,
+}) async {
+  final response = await http.get(
+    Uri.parse("${ApiConfig.baseUrl}/user-following/$userId"),
+    headers: {
+      "Authorization": "Bearer $token",
+    },
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception("Failed to load user following: ${response.body}");
+  }
+
+  final data = jsonDecode(response.body) as List;
+  return data.map((e) => UserModel.fromJson(e)).toList();
+}
+}
 
 // =========================
 // Save and Unsave Api
@@ -424,6 +503,7 @@ class SavePostApi {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception("Failed to save post: ${response.body}");
     }
+  
   }
 
   static Future<void> unsavePost({
@@ -478,3 +558,5 @@ class SavePostShowApi {
     }
   }
 }
+
+

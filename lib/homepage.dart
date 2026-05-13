@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:open_ui/aichatscreen.dart';
 import 'package:open_ui/blogpostcard.dart';
 import 'package:open_ui/postupload.dart';
+import 'package:open_ui/taskscreen.dart';
 import 'package:open_ui/widgets/bottombar.dart';
 
 class HomePage extends StatefulWidget {
@@ -44,7 +45,7 @@ class _HomePageState extends State<HomePage> {
           // 🔹 Scroll Content
           SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 120),
-            child: const BlogPosImagetCard(),
+            child:const BlogPosImagetCard(),
           ),
 
           // 🔹 Bottom Bar

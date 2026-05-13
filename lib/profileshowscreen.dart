@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:open_ui/folloedusershow.dart';
 import 'package:open_ui/homepage.dart';
 import 'package:open_ui/mypostscreen.dart';
 import 'package:open_ui/riverpod/profileshow_provider.dart';
 
 import '../widgets/bottombar.dart';
-// 👈 make sure this exists
 
 class ProfileShowScreen extends ConsumerWidget {
   const ProfileShowScreen({super.key});
@@ -116,7 +116,7 @@ class ProfileShowScreen extends ConsumerWidget {
                       ),
                     ),
 
-                    /// PROFILE IMAGE with static RGB border
+                    // PROFILE IMAGE
                     Center(
                       child: Container(
                         width: 116,
@@ -158,7 +158,7 @@ class ProfileShowScreen extends ConsumerWidget {
 
                     const SizedBox(height: 24),
 
-                    // ── YOUR POSTS BUTTON (ADDED) ──
+                    // ── BUTTON 1 - FOLLOWING ──
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: GestureDetector(
@@ -166,7 +166,56 @@ class ProfileShowScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const MyPostsScreen(userId: 3,),
+                              builder: (_) =>
+                                  UserFollowingScreen(userId: 3),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF6A3DE8),
+                                Color(0xFF3A7BD5),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                "Following",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ── BUTTON 2 - MY POSTS ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MyPostsScreen(userId: 3),
                             ),
                           );
                         },
@@ -185,8 +234,11 @@ class ProfileShowScreen extends ConsumerWidget {
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.article_rounded,
-                                  color: Colors.white, size: 18),
+                              Icon(
+                                Icons.article_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                               SizedBox(width: 8),
                               Text(
                                 "My Posts",
@@ -322,8 +374,7 @@ class ProfileShowScreen extends ConsumerWidget {
           Expanded(
             child: Text(
               value,
-              textAlign:
-                  justified ? TextAlign.justify : TextAlign.start,
+              textAlign: justified ? TextAlign.justify : TextAlign.start,
               style: const TextStyle(color: Colors.white),
             ),
           ),
