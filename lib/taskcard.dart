@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:open_ui/model/taskmodel.dart';
 import 'package:open_ui/taskcommandpage.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TaskCard extends StatelessWidget {
   final TaskModel task;
@@ -35,7 +37,7 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  // ── 1. PROFILE HEADER ──────────────────────────────────────────────────────
+  // ───────────────── PROFILE HEADER ─────────────────
   Widget _buildProfileHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -53,31 +55,35 @@ class TaskCard extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: const Center(
-              child: Text(
-                'BF',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+            child: ClipOval(
+              child: task.user.profileImage.isNotEmpty
+                  ? Image.network(
+                      task.user.profileImage,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return _fallbackAvatar();
+                      },
+                    )
+                  : _fallbackAvatar(),
             ),
           ),
+
           const SizedBox(width: 10),
+
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'BetterFlutter',
-                style: TextStyle(
+              Text(
+                task.user.name,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
+
               Text(
-                task.category,
+                "@${task.user.username}",
                 style: const TextStyle(
                   color: Color(0xFF82B1FF),
                   fontSize: 11,
@@ -86,64 +92,103 @@ class TaskCard extends StatelessWidget {
               ),
             ],
           ),
+
           const Spacer(),
+
           const Icon(Icons.more_horiz_rounded, color: Colors.white54, size: 22),
         ],
       ),
     );
   }
 
-  // ── 2. TASK IMAGE / BANNER ─────────────────────────────────────────────────
-  Widget _buildTaskImage() {
+  Widget _fallbackAvatar() {
     return Container(
-      height: 160,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF1565C0)],
+      color: const Color(0xFF3949AB),
+      child: Center(
+        child: Text(
+          task.user.name.isNotEmpty ? task.user.name[0].toUpperCase() : "?",
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -30,
-            left: -20,
-            child: _blob(120, const Color(0xFF3949AB)),
+    );
+  }
+
+  // ───────────────── TASK IMAGE ─────────────────
+  Widget _buildTaskImage() {
+    if (task.images.isEmpty) {
+      return Container(
+        height: 160,
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A237E), Color(0xFF283593), Color(0xFF1565C0)],
           ),
-          Positioned(
-            bottom: -40,
-            right: -10,
-            child: _blob(100, const Color(0xFF1A237E)),
-          ),
-          Positioned(
-            top: 16,
-            right: 20,
-            child: _PhonePreviewCard(),
-          ),
-          Positioned(
-            bottom: 14,
-            left: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Text(
-                task.category,
-                style: const TextStyle(
-                  color: Color(0xFF82B1FF),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -30,
+              left: -20,
+              child: _blob(120, const Color(0xFF3949AB)),
+            ),
+
+            Positioned(
+              bottom: -40,
+              right: -10,
+              child: _blob(100, const Color(0xFF1A237E)),
+            ),
+
+            Positioned(top: 16, right: 20, child: _PhonePreviewCard()),
+
+            Positioned(
+              bottom: 14,
+              left: 14,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Text(
+                  "@${task.user.username}",
+                  style: const TextStyle(
+                    color: Color(0xFF82B1FF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 220,
+      width: double.infinity,
+      child: Image.network(
+        task.images.first.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) {
+          return Container(
+            color: Colors.grey.shade900,
+            child: const Center(
+              child: Icon(Icons.broken_image, color: Colors.white54, size: 45),
+            ),
+          );
+        },
       ),
     );
   }
@@ -159,7 +204,7 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  // ── 3. TASK TITLE ──────────────────────────────────────────────────────────
+  // ───────────────── TITLE ─────────────────
   Widget _buildTitle() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -175,166 +220,200 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  // ── 4. TASK CONTENT ────────────────────────────────────────────────────────
+  // ───────────────── CONTENT (with clickable links) ─────────────────
   Widget _buildContent() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            task.description,
-            textAlign: TextAlign.justify,
-            style: const TextStyle(
-              color: Color(0xFFB0B0C8),
-              fontSize: 13,
-              height: 1.55,
-            ),
+      child: _buildRichContent(task.content),
+    );
+  }
+
+  /// Parses plain text and turns URLs into tappable links.
+  Widget _buildRichContent(String text) {
+    final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+
+    final spans = <TextSpan>[];
+    int lastEnd = 0;
+
+    for (final match in urlRegex.allMatches(text)) {
+      // Plain text before the URL
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+
+      final url = match.group(0)!;
+      spans.add(
+        TextSpan(
+          text: url,
+          style: const TextStyle(
+            color: Color(0xFF82B1FF),
+            decoration: TextDecoration.underline,
+            decorationColor: Color(0xFF82B1FF),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Your application must include the following features:',
-            style: TextStyle(
-              color: Color(0xFFCCCCDD),
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          ...List.generate(task.features.length, (i) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 5),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${i + 1}. ',
-                    style: const TextStyle(
-                      color: Color(0xFFCCCCDD),
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      task.features[i],
-                      textAlign: TextAlign.justify,
-                      style: const TextStyle(
-                        color: Color(0xFFCCCCDD),
-                        fontSize: 13,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                  Divider(
-  color: Colors.grey,
-  thickness: 1.0,
-  height: 20.0,  // Space above and below
-  indent: 10.0,  // Space from left
-  endIndent: 10.0, // Space from right
-)
-                ],
-              ),
-            );
-          }),
-        ],
+          recognizer: TapGestureRecognizer()
+            ..onTap = () async {
+              final uri = Uri.tryParse(url);
+              if (uri != null && await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+        ),
+      );
+
+      lastEnd = match.end;
+    }
+
+    // Remaining plain text after last URL
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+
+    return RichText(
+      textAlign: TextAlign.justify,
+      text: TextSpan(
+        style: const TextStyle(
+          color: Color(0xFFB0B0C8),
+          fontSize: 13,
+          height: 1.55,
+        ),
+        children: spans,
       ),
     );
   }
 
-  // ── 5. BOTTOM BAR: comment + save ─────────────────────────────────────────
-Widget _buildBottomBar(BuildContext context) {
-  return Column(
-    children: [
-      // ── Separator line ──────────────────────────────────────────
-      Divider(
-        color: Colors.white.withOpacity(0.08),
-        thickness: 1,
-        height: 1,
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Comment button
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => TaskCommentPage(task: task),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A3E),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF3A3A50), width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.mode_comment_outlined,
-                        color: Colors.white70, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${task.likes}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+  // ───────────────── BOTTOM BAR ─────────────────
+  Widget _buildBottomBar(BuildContext context) {
+    // Format timestamp — falls back gracefully if task.createdAt is null
+    final String timestamp = _formatTimestamp(task.createdAt);
+
+    return Column(
+      children: [
+        Divider(color: Colors.white.withOpacity(0.08), thickness: 1, height: 1),
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: Row(
+            children: [
+              // ── Timestamp (bottom-left) ──
+              Text(
+                timestamp,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Save / Bookmark button
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
+
+              const Spacer(),
+
+              // ── Comment button ──
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TaskCommentPage(task: task),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2A2A3E),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF3A3A50), width: 1),
-                  ),
-                  child: const Icon(
-                    Icons.bookmark_rounded,
-                    color: Colors.white70,
-                    size: 22,
-                  ),
-                ),
-                Positioned(
-                  top: -6,
-                  right: -6,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF3A3A50),
+                      width: 1,
                     ),
-                    child: const Icon(Icons.add, color: Colors.white, size: 13),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.mode_comment_outlined,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Comment',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+
+              const SizedBox(width: 12),
+
+              // ── Bookmark button ──
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A3E),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF3A3A50),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.bookmark_rounded,
+                      color: Colors.white70,
+                      size: 22,
+                    ),
+                  ),
+
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }
+
+  /// Formats a nullable DateTime into a readable timestamp string.
+  String _formatTimestamp(DateTime? dt) {
+    if (dt == null) return '';
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final year = dt.year;
+    return '$day/$month/$year  $hour:$minute';
+  }
 }
 
-// ── PHONE PREVIEW CARD ────────────────────────────────────────────────────────
+// ───────────────── PHONE PREVIEW CARD ─────────────────
 class _PhonePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -363,38 +442,50 @@ class _PhonePreviewCard extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('4:12',
-                    style:
-                        TextStyle(fontSize: 8, color: Colors.black87)),
-                Row(children: [
-                  Icon(Icons.signal_cellular_alt,
-                      size: 8, color: Colors.black87),
-                  const SizedBox(width: 2),
-                  Icon(Icons.battery_full,
-                      size: 8, color: Colors.black87),
-                ]),
+                const Text(
+                  '4:12',
+                  style: TextStyle(fontSize: 8, color: Colors.black87),
+                ),
+                Row(
+                  children: const [
+                    Icon(
+                      Icons.signal_cellular_alt,
+                      size: 8,
+                      color: Colors.black87,
+                    ),
+                    SizedBox(width: 2),
+                    Icon(Icons.battery_full, size: 8, color: Colors.black87),
+                  ],
+                ),
               ],
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Hi David!',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black87)),
-                const Text('8 tasks for today, Monday',
-                    style:
-                        TextStyle(fontSize: 7, color: Colors.black45)),
+                const Text(
+                  'Hi David!',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Text(
+                  '8 tasks for today, Monday',
+                  style: TextStyle(fontSize: 7, color: Colors.black45),
+                ),
                 const SizedBox(height: 6),
-                _previewRow(
-                    '9:00', 'Daily stand-up', const Color(0xFF5C6BC0)),
+                _previewRow('9:00', 'Daily stand-up', const Color(0xFF5C6BC0)),
                 const SizedBox(height: 4),
-                _previewRow('10:30', 'New UI Kit for the app',
-                    const Color(0xFF26A69A)),
+                _previewRow(
+                  '10:30',
+                  'New UI Kit for the app',
+                  const Color(0xFF26A69A),
+                ),
               ],
             ),
           ),
@@ -419,14 +510,16 @@ class _PhonePreviewCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(time,
-                  style: const TextStyle(
-                      fontSize: 7, color: Colors.black45)),
-              Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 7.5, color: Colors.black87)),
+              Text(
+                time,
+                style: const TextStyle(fontSize: 7, color: Colors.black45),
+              ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 7.5, color: Colors.black87),
+              ),
             ],
           ),
         ),

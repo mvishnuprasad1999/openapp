@@ -167,12 +167,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:open_ui/folloedusershow.dart';
-import 'package:open_ui/mypostscreen.dart';
-import 'package:open_ui/otheruserfollowed.dart';
-import 'package:open_ui/perticularuserprofile.dart';
 import 'package:open_ui/profileshowscreen.dart';
 import 'package:open_ui/savedpostscreen.dart';
+import 'package:open_ui/taskscreen.dart';
 import '../homepage.dart';
 
 class CustomBottomBar extends StatefulWidget {
@@ -239,10 +236,10 @@ class _CustomBottomBarState extends State<CustomBottomBar>
         );
         break;
       case 1:
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(builder: (_) => const FollowingScreen()),
-        // );
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TaskScreen()),
+        );
         break;
       case 2:
         Navigator.push(

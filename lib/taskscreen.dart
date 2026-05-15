@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:open_ui/model/taskmodel.dart';
+import 'package:open_ui/services/api_services.dart';
 import 'package:open_ui/taskcard.dart';
-
-import 'package:open_ui/widgets/bottombar.dart'; // adjust import path as needed
+import 'package:open_ui/taskuploadscreen.dart';
+import 'package:open_ui/widgets/bottombar.dart';
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -12,93 +13,144 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  int _selectedIndex = 0;
 
-  final List<TaskModel> tasks = [
-    TaskModel(
-      id: '1',
-      category: 'BetterFlutter',
-      title: 'Build this UI in Flutter –\n"Task Manager"',
-      description:
-          'Build a functional, state-managed Task Manager application using Flutter. '
-          'This project will test your ability to handle UI layouts, user input, and local data persistence.',
-      features: [
-        'Task Dashboard: A clean list view showing all current tasks.',
-        'Add Task Screen: A form to input a task title, a brief description, and a due date.',
-        'Task Completion: A toggle system (like a checkbox) to mark tasks as "Done."',
-        'Delete Functionality: The ability to remove a task using a "Swipe to Delete" or a delete icon.',
-      ],
-      likes: 100,
-    ),
-    TaskModel(
-      id: '2',
-      category: 'BetterFlutter',
-      title: 'Build a Weather App\nin Flutter',
-      description:
-          'Create a beautiful weather application with real-time data, '
-          'animated backgrounds, and hourly/weekly forecasts.',
-      features: [
-        'Location Search: Auto-detect or manually search for any city.',
-        'Current Weather: Show temperature, humidity, wind speed.',
-        'Hourly Forecast: Scrollable hourly breakdown for the day.',
-        'Weekly Forecast: 7-day overview with high/low temperatures.',
-      ],
-      likes: 87,
-    ),
-    TaskModel(
-      id: '3',
-      category: 'BetterFlutter',
-      title: 'Build a Chat UI\nin Flutter',
-      description:
-          'Design a fully functional chat interface with bubbles, timestamps, '
-          'read receipts, and image sharing capabilities.',
-      features: [
-        'Message Bubbles: Differentiated sent/received styles.',
-        'Timestamps: Grouped by date headers.',
-        'Image Sharing: Pick from gallery or camera.',
-        'Typing Indicator: Animated dots while other user types.',
-      ],
-      likes: 143,
-    ),
-  ];
+  List<TaskModel> tasks = [];
+
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadTasks();
+  }
+
+  Future<void> loadTasks() async {
+
+    try {
+
+      final fetchedTasks = await TaskApi.getTasks();
+
+      setState(() {
+        tasks = fetchedTasks;
+      });
+
+    } catch (e) {
+
+      debugPrint(e.toString());
+
+    } finally {
+
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       backgroundColor: const Color(0xFF121218),
+
       body: SafeArea(
         child: Stack(
           children: [
-            // ── Main content ──────────────────────────────────────────
+
             Column(
               children: [
+
                 _buildTopBar(),
+
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                    itemCount: tasks.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) => TaskCard(task: tasks[index]),
-                  ),
+                  child: isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : tasks.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "No Tasks",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: loadTasks,
+                              child: ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 8, 16, 120),
+
+                                itemCount: tasks.length,
+
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 16),
+
+                                itemBuilder: (context, index) {
+
+                                  return TaskCard(
+                                    task: tasks[index],
+                                  );
+                                },
+                              ),
+                            ),
                 ),
               ],
             ),
 
-            // ── Custom Bottom Bar ─────────────────────────────────────
             CustomBottomBar(selectedIndex: 1),
+
+            Positioned(
+              right: 25,
+              bottom: 110,
+              child: _buildFAB(),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ── TOP BAR ──────────────────────────────────────────────────────────────
+  Widget _buildFAB() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TaskUploadScreen(),
+          ),
+        );
+      },
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.red,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withOpacity(0.45),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.add,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          // Logo mark
+
           Container(
             width: 32,
             height: 32,
@@ -117,7 +169,9 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ),
           ),
+
           const SizedBox(width: 6),
+
           const Text(
             'ask',
             style: TextStyle(
@@ -127,6 +181,7 @@ class _TaskScreenState extends State<TaskScreen> {
               letterSpacing: 0.5,
             ),
           ),
+
           const Spacer(),
         ],
       ),

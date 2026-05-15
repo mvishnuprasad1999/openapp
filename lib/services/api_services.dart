@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:open_ui/model/createpostshowmodel.dart';
+import 'package:open_ui/model/taskmodel.dart';
 import 'package:open_ui/model/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -558,5 +559,116 @@ class SavePostShowApi {
     }
   }
 }
+// =========================
+// TASK UPLOAD API
+// =========================
+
+class TaskUploadApi {
+  static Future<void> createTask({
+    required String token,
+    required String title,
+    required String content,
+    required List<File> files,
+  }) async {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse("${ApiConfig.baseUrl}/create-task"),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+
+    request.fields['title'] = title;
+    request.fields['content'] = content;
+
+    /// MULTIPLE IMAGES
+    for (var file in files) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'files',
+          file.path,
+        ),
+      );
+    }
+
+    final response = await request.send();
+
+    final body = await response.stream.bytesToString();
+
+    if (response.statusCode != 200 &&
+        response.statusCode != 201) {
+      throw Exception("Task upload failed: $body");
+    }
+  }
+}
+
+// =========================
+// TASK FETCH API
+// =========================
+
+class TaskApi {
+
+  static Future<List<TaskModel>> getTasks() async {
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/tasks"),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load tasks");
+    }
+
+    final data = jsonDecode(res.body) as List;
+
+    return data
+        .map((e) => TaskModel.fromJson(e))
+        .toList();
+  }
+}
+
+// =========================
+// TASK SOLUTION API
+// =========================
+
+class TaskSolutionApi {
+  /// ADD SOLUTION / REPLY
+static Future<void> addSolution({
+  required int taskId,
+  required String content,
+  required String token,
+  String? parentId,
+}) async {
+  final request = http.MultipartRequest(
+    'POST',
+    Uri.parse("${ApiConfig.baseUrl}/task-solution/$taskId"),
+  );
+
+  request.headers['Authorization'] = 'Bearer $token';
+  request.fields['content'] = content;
+
+  if (parentId != null && parentId.isNotEmpty) {
+    request.fields['parent_id'] = parentId;
+  }
+
+  final response = await request.send();
+  final body = await response.stream.bytesToString();
+
+  if (response.statusCode != 200 && response.statusCode != 201) {
+    throw Exception("Failed to add solution: $body");
+  }
+}
 
 
+  /// GET TASKS AGAIN (refresh)
+  static Future<List<TaskModel>> refreshTasks() async {
+    final res = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/tasks"),
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception("Failed to load tasks");
+    }
+
+    final data = jsonDecode(res.body) as List;
+
+    return data.map((e) => TaskModel.fromJson(e)).toList();
+  }
+}
